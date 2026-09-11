@@ -24,49 +24,49 @@ export const TIMELINE_EVENTS: TimelineEvent[] = [
   {
     step: '01',
     timestamp: '17:30:00Z',
-    triggerName: 'Initial Baseline Dispatch',
-    reason: 'Routine baseline resource deployment across initial reported operational sectors.',
+    triggerName: 'National Relief Baseline Deployment',
+    reason: 'Inter-state baseline logistics established from Nagpur Central Depot to regional response battalions.',
     diffs: [
-      { resource: 'Water Purification Unit', fromZone: 'Depot North', toZone: 'Zone 042 (Riverside)', previousQty: 0, newQty: 500, changeType: 'added', impact: 'Establishes initial clean water point' },
-      { resource: 'Field Hospital Tent', fromZone: 'Central Depot', toZone: 'Zone 044 (Downtown)', previousQty: 0, newQty: 10, changeType: 'added', impact: 'Primary medical triage staging' },
-      { resource: 'Heavy Rescue Squad', fromZone: 'Depot South', toZone: 'Zone 043 (Hillside)', previousQty: 0, newQty: 4, changeType: 'added', impact: 'Precautionary slope inspection' },
-      { resource: 'Emergency Rations', fromZone: 'Depot North', toZone: 'Zone 041 (East Harbor)', previousQty: 1000, newQty: 1000, changeType: 'unchanged', impact: 'Standard baseline rations' },
+      { resource: 'High-Capacity Water Purifiers', fromZone: 'Pune Western Depot', toZone: 'Zone 042 (Wayanad, Kerala)', previousQty: 0, newQty: 40, changeType: 'added', impact: 'Establishes safe drinking water in Meppadi relief camps' },
+      { resource: 'Trauma Surgical Kits', fromZone: 'Nagpur Central Depot', toZone: 'Zone 044 (Guwahati, Assam)', previousQty: 0, newQty: 120, changeType: 'added', impact: 'Pre-positions emergency surgical inventory at Guwahati Medical Center' },
+      { resource: 'Inflatable Rescue Boats (Gemini)', fromZone: 'Arakkonam NDRF Base', toZone: 'Zone 043 (Puri, Odisha)', previousQty: 0, newQty: 18, changeType: 'added', impact: 'Precautionary coastal cyclone evacuation teams' },
+      { resource: 'Emergency Food Packets', fromZone: 'Kolkata Eastern Depot', toZone: 'Zone 041 (Joshimath, Uttarakhand)', previousQty: 4000, newQty: 4000, changeType: 'unchanged', impact: 'Highland hill slope baseline rations maintained' },
     ]
   },
   {
     step: '02',
     timestamp: '18:15:22Z',
-    triggerName: 'Ward 7 Levee Breach',
-    reason: 'Water level surge +12 delta reported. Rapid medical and evacuation emergency.',
+    triggerName: 'Wayanad Meppadi Hillside Surge',
+    reason: 'Cloudburst triggered devastating landslide in Meppadi hills. Urgent extrication and crush injury triage required.',
     diffs: [
-      { resource: 'Mobile Clinic (Medical)', fromZone: 'Zone 043 (Hillside)', toZone: 'Zone 042 (Riverside)', previousQty: 1, newQty: 3, changeType: 'added', impact: 'Stabilizes rising hypothermia triage demand' },
-      { resource: 'Inflatable Zodiac Boats', fromZone: 'Depot South', toZone: 'Zone 042 (Riverside)', previousQty: 0, newQty: 8, changeType: 'added', impact: 'Water rescue for stranded shoreline residents' },
-      { resource: 'Emergency Rations', fromZone: 'Zone 041 (East Harbor)', toZone: 'Zone 042 (Riverside)', previousQty: 1000, newQty: 400, changeType: 'reduced', impact: 'Diverted surplus rations to active flood shelter' },
-      { resource: 'Field Hospital Tent', fromZone: 'Central Depot', toZone: 'Zone 044 (Downtown)', previousQty: 10, newQty: 10, changeType: 'unchanged', impact: 'Maintained downtown medical staging' },
+      { resource: 'Heavy Debris Cutters & Extrication Kits', fromZone: 'Arakkonam NDRF Base', toZone: 'Zone 042 (Wayanad, Kerala)', previousQty: 4, newQty: 16, changeType: 'added', impact: 'Enables rapid search through rubble and mudflow layers' },
+      { resource: 'Trauma Surgical Kits', fromZone: 'Nagpur Central Depot', toZone: 'Zone 042 (Wayanad, Kerala)', previousQty: 50, newQty: 250, changeType: 'added', impact: 'Surge surgical capacity deployed to Mananthavady field clinic' },
+      { resource: 'Emergency Food Packets', fromZone: 'Pune Western Depot', toZone: 'Zone 042 (Wayanad, Kerala)', previousQty: 3000, newQty: 8000, changeType: 'added', impact: 'Food supplies for 4,800 displaced plantation residents' },
+      { resource: 'Inflatable Rescue Boats (Gemini)', fromZone: 'Arakkonam NDRF Base', toZone: 'Zone 043 (Puri, Odisha)', previousQty: 18, newQty: 10, changeType: 'reduced', impact: 'Surplus boats re-routed as coastal cyclone alert downgraded' },
     ]
   },
   {
     step: '03',
     timestamp: '18:40:05Z',
-    triggerName: 'Downtown Core Collapse',
-    reason: 'Magnitude 6.4 seismic shock collapse. Critical structural rescue required immediately.',
+    triggerName: 'Guwahati Brahmaputra Embankment Breach',
+    reason: 'Water gauge +15cm breach along Guwahati riverbanks. Island settlement rescue underway by SDRF.',
     diffs: [
-      { resource: 'Heavy Rescue Squad', fromZone: 'Zone 043 (Hillside)', toZone: 'Zone 044 (Downtown)', previousQty: 4, newQty: 1, changeType: 'reduced', impact: 'Reassigned heavy equipment to urban search operations' },
-      { resource: 'Heavy Rescue Squad', fromZone: 'Depot South', toZone: 'Zone 044 (Downtown)', previousQty: 2, newQty: 6, changeType: 'added', impact: 'Reinforced rubble excavation teams' },
-      { resource: 'Emergency Generators', fromZone: 'Depot North', toZone: 'Zone 044 (Downtown)', previousQty: 0, newQty: 12, changeType: 'added', impact: 'Powers perimeter floodlights for night rescue' },
-      { resource: 'Water Purification Unit', fromZone: 'Depot North', toZone: 'Zone 042 (Riverside)', previousQty: 500, newQty: 500, changeType: 'unchanged', impact: 'Flood water purification remains steady' },
+      { resource: 'Inflatable Rescue Boats (Gemini)', fromZone: 'Kolkata Eastern Depot', toZone: 'Zone 044 (Guwahati, Assam)', previousQty: 6, newQty: 28, changeType: 'added', impact: 'Primary water evacuation for marooned riverbank wards' },
+      { resource: 'High-Capacity Water Purifiers', fromZone: 'Nagpur Central Depot', toZone: 'Zone 044 (Guwahati, Assam)', previousQty: 10, newQty: 60, changeType: 'added', impact: 'Prevents waterborne epidemic across flooded urban sectors' },
+      { resource: 'Heavy Debris Cutters', fromZone: 'Arakkonam NDRF Base', toZone: 'Zone 042 (Wayanad, Kerala)', previousQty: 16, newQty: 16, changeType: 'unchanged', impact: 'Maintains critical landslide rescue operations' },
+      { resource: 'Emergency Food Packets', fromZone: 'Kolkata Eastern Depot', toZone: 'Zone 044 (Guwahati, Assam)', previousQty: 2000, newQty: 12000, changeType: 'added', impact: 'Airdrop and boat distribution rations' },
     ]
   },
   {
     step: '04',
     timestamp: '19:05:40Z',
-    triggerName: 'Agent B Optimization Sweep',
-    reason: 'Automated multi-objective algorithm re-balanced resources to avoid duplicate bottlenecks.',
+    triggerName: 'Agent B National Optimization Sweep',
+    reason: 'Automated multi-objective algorithm rebalanced NDRF and SDRF deployments to eliminate regional overlapping.',
     diffs: [
-      { resource: 'Mobile Clinic (Medical)', fromZone: 'Zone 01', toZone: 'Zone 042 (Riverside)', previousQty: 2, newQty: 4, changeType: 'added', impact: 'Zone 01 stabilized; Zone 042 critical care expanded' },
-      { resource: 'FEMA Response Team', fromZone: 'Zone 042 (Riverside)', toZone: 'Zone 044 (Downtown)', previousQty: 40, newQty: 15, changeType: 'reduced', impact: 'Resolved duplicate medical effort with Red Cross Unit 4' },
-      { resource: 'Trauma Surgical Kits', fromZone: 'Central Depot', toZone: 'Zone 044 (Downtown)', previousQty: 20, newQty: 50, changeType: 'added', impact: 'Provides trauma care supplies for 30+ additional casualties' },
-      { resource: 'Inflatable Zodiac Boats', fromZone: 'Depot South', toZone: 'Zone 042 (Riverside)', previousQty: 8, newQty: 8, changeType: 'unchanged', impact: 'No change to watercraft deployment' },
+      { resource: 'NDRF Search Teams', fromZone: 'Zone 043 (Puri, Odisha)', toZone: 'Zone 042 (Wayanad, Kerala)', previousQty: 20, newQty: 65, changeType: 'added', impact: 'Expands night-vision canine search teams in Meppadi landslide' },
+      { resource: 'SDRF Disaster Strike Force', fromZone: 'Zone 042 (Wayanad, Kerala)', toZone: 'Zone 046 (Kochi Backwaters)', previousQty: 45, newQty: 15, changeType: 'reduced', impact: 'Resolved duplicate medical triage with Indian Red Cross in Wayanad' },
+      { resource: 'Trauma Surgical Kits', fromZone: 'Nagpur Central Depot', toZone: 'Zone 042 (Wayanad, Kerala)', previousQty: 250, newQty: 350, changeType: 'added', impact: 'Maintains 48-hour reserve for intensive care trauma beds' },
+      { resource: 'Inflatable Rescue Boats (Gemini)', fromZone: 'Kolkata Eastern Depot', toZone: 'Zone 044 (Guwahati, Assam)', previousQty: 28, newQty: 28, changeType: 'unchanged', impact: 'River patrol operations sustained without interruption' },
     ]
   }
 ];

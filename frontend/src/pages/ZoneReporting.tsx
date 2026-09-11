@@ -32,13 +32,13 @@ export default function ZoneReporting() {
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [submittedZoneId, setSubmittedZoneId] = useState<string | null>(null);
 
-  // Auto-geocode preview coordinate resolution based on location input
+  // Auto-geocode preview coordinate resolution based on location input (India coordinates)
   const resolvedLat = locationName.trim()
-    ? (34.0522 + (locationName.length * 0.007) % 0.1).toFixed(4)
-    : '34.0522';
+    ? (11.5540 + (locationName.length * 0.015) % 15.0).toFixed(4)
+    : '11.5540';
   const resolvedLng = locationName.trim()
-    ? (-118.2437 - (locationName.length * 0.009) % 0.1).toFixed(4)
-    : '-118.2437';
+    ? (76.1265 + (locationName.length * 0.018) % 15.0).toFixed(4)
+    : '76.1265';
 
   const mutation = useMutation({
     mutationFn: (data: Partial<Zone>) => apiClient.submitReport(data),

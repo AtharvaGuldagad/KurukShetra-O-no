@@ -9,8 +9,9 @@ if (!document.getElementById(STYLE_ID)) {
   style.id = STYLE_ID;
   style.textContent = `
     @keyframes ps20-live-pulse {
-      0%   { outline: 3px solid rgba(62, 124, 177, 0.9); outline-offset: 1px; }
-      100% { outline: 0px solid rgba(62, 124, 177, 0); outline-offset: 6px; }
+      0%   { box-shadow: 0 0 0 0 rgba(62, 124, 177, 0.8); }
+      70%  { box-shadow: 0 0 0 10px rgba(62, 124, 177, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(62, 124, 177, 0); }
     }
     .ps20-marker-wrap {
       background: transparent !important;
@@ -26,13 +27,14 @@ if (!document.getElementById(STYLE_ID)) {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 600;
+      font-weight: 700;
       line-height: 1;
       color: #E8EAED;
       font-family: 'IBM Plex Mono', monospace;
-      border-radius: 2px;
+      border-radius: 50%;
       box-sizing: border-box;
       user-select: none;
+      cursor: pointer;
     }
     .ps20-marker-pulse-active {
       animation: ps20-live-pulse 600ms ease-out forwards;
@@ -42,9 +44,9 @@ if (!document.getElementById(STYLE_ID)) {
       border: 1px solid #2A2E33;
       color: #E8EAED;
       border-radius: 2px;
-      font-size: 12px;
-      padding: 6px 8px;
-      box-shadow: none;
+      font-size: 11px;
+      padding: 6px 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
       font-family: 'Public Sans', sans-serif;
     }
     .leaflet-tooltip-ps20.leaflet-tooltip-top::before {
@@ -54,8 +56,14 @@ if (!document.getElementById(STYLE_ID)) {
       background: #0E0F11 !important;
       font-family: 'Public Sans', sans-serif !important;
     }
-    .custom-dark-tiles {
-      filter: brightness(0.55) invert(1) contrast(2.6) hue-rotate(205deg) saturate(0.2);
+    /* Minimal dark CartoDB attribution styling */
+    .leaflet-control-attribution {
+      background: rgba(14, 15, 17, 0.8) !important;
+      color: #9BA1A8 !important;
+      font-size: 9px !important;
+    }
+    .leaflet-control-attribution a {
+      color: #3E7CB1 !important;
     }
   `;
   document.head.appendChild(style);
@@ -68,14 +76,18 @@ const TIER_COLORS: Record<string, string> = {
   Low:      '#4C7A5E',
 };
 
+// Default India center coordinates
+const INDIA_CENTER: L.LatLngTuple = [21.5, 79.0];
+const INDIA_ZOOM = 5;
+
 function createZoneIcon(zone: Zone, isSelected: boolean, isRecentlyUpdated: boolean): L.DivIcon {
   const color = TIER_COLORS[zone.priority_tier] ?? '#9BA1A8';
   
-  // Size slightly by population affected (14px to 22px)
+  // Moderate size: 18px to 24px
   const pop = zone.population_affected_est || 1000;
-  const sizeRatio = Math.min(1, Math.max(0, (pop - 1000) / 15000));
-  const baseSize = Math.round(15 + sizeRatio * 7); // 15 to 22px
-  const wrapSize = baseSize + 12;
+  const sizeRatio = Math.min(1, Math.max(0, (pop - 1000) / 20000));
+  const baseSize = Math.round(18 + sizeRatio * 6);
+  const wrapSize = baseSize + 8;
   const pulseClass = isRecentlyUpdated ? 'ps20-marker-pulse-active' : '';
 
   return L.divIcon({
@@ -86,8 +98,8 @@ function createZoneIcon(zone: Zone, isSelected: boolean, isRecentlyUpdated: bool
           width:${baseSize}px;
           height:${baseSize}px;
           background:${color};
-          border:${isSelected ? '2px solid #E8EAED' : '1px solid rgba(0,0,0,0.6)'};
-          font-size:${baseSize <= 16 ? 9 : 10}px;
+          border:${isSelected ? '2.5px solid #FFFFFF' : '1.5px solid rgba(14,15,17,0.8)'};
+          font-size:${baseSize <= 18 ? 9 : 10}px;
         ">
           <span>${zone.severity_score}</span>
         </div>
@@ -116,23 +128,26 @@ export default function ZoneMap({
   const onSelectRef  = useRef(onSelectZone);
   onSelectRef.current = onSelectZone;
 
-  // Init map once
+  // Init clean CartoDB Dark Matter map once (India view)
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
     const map = L.map(mapRef.current, {
-      center: [34.052, -118.250],
-      zoom: 12,
+      center: INDIA_CENTER,
+      zoom: INDIA_ZOOM,
       zoomControl: true,
-      attributionControl: false,
+      attributionControl: true,
+      minZoom: 4,
+      maxZoom: 16,
     });
 
+    // CartoDB Dark Matter: Clean, minimal, high-contrast, uncluttered basemap
     L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
       {
-        subdomains: 'abc',
+        attribution: '&copy; CartoDB &copy; OpenStreetMap',
+        subdomains: 'abcd',
         maxZoom: 19,
-        className: 'custom-dark-tiles',
       }
     ).addTo(map);
 
@@ -186,20 +201,40 @@ export default function ZoneMap({
       }
     });
 
+    // Fly to selected zone
     if (selectedZoneId) {
       const z = zones.find(z => z.zone_id === selectedZoneId);
-      if (z) map.flyTo([z.location.lat, z.location.lng], 13, { duration: 0.5 });
+      if (z) map.flyTo([z.location.lat, z.location.lng], 9, { duration: 0.6 });
     }
   }, [zones, selectedZoneId, recentlyUpdated]);
+
+  const handleResetIndiaView = () => {
+    if (mapInstance.current) {
+      mapInstance.current.flyTo(INDIA_CENTER, INDIA_ZOOM, { duration: 0.6 });
+    }
+  };
 
   return (
     <div className="relative w-full h-full bg-[#0E0F11]">
       <div ref={mapRef} className="w-full h-full" />
-      <div className="absolute bottom-2 left-2 z-[500] bg-[#171A1D] border border-[#2A2E33] px-2 py-1 text-[11px] text-[#9BA1A8] flex items-center gap-3">
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-[#C4432E]" /> Critical</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-[#C97A2E]" /> High</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-[#B8A13A]" /> Medium</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-[#4C7A5E]" /> Low</span>
+
+      {/* Overview controls overlay */}
+      <div className="absolute top-2 right-2 z-[500] flex items-center gap-2">
+        <button
+          onClick={handleResetIndiaView}
+          className="px-2.5 py-1 bg-[#171A1D] border border-[#2A2E33] hover:border-[#3E7CB1] text-[#E8EAED] text-xs uppercase tracking-tight font-medium select-none cursor-pointer"
+        >
+          Reset National View
+        </button>
+      </div>
+
+      {/* Compact operational legend */}
+      <div className="absolute bottom-2 left-2 z-[500] bg-[#171A1D]/90 border border-[#2A2E33] px-2.5 py-1 text-[11px] text-[#9BA1A8] flex items-center gap-3 select-none">
+        <span className="font-semibold text-[#E8EAED] uppercase tracking-tight">Triage:</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#C4432E]" /> Critical</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#C97A2E]" /> High</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#B8A13A]" /> Medium</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#4C7A5E]" /> Low</span>
       </div>
     </div>
   );
@@ -209,12 +244,12 @@ function buildTooltip(zone: Zone): string {
   const color = TIER_COLORS[zone.priority_tier] ?? '#9BA1A8';
   return `
     <div style="font-family: 'Public Sans', sans-serif;">
-      <div style="font-weight: 600; color:#E8EAED;">${zone.location.name}</div>
-      <div style="font-size: 11px; margin-top: 2px; color: ${color}; font-weight: 600;">
+      <div style="font-weight: 700; color:#E8EAED;">${zone.location.name}</div>
+      <div style="font-size: 11px; margin-top: 2px; color: ${color}; font-weight: 700;">
         ${zone.priority_tier.toUpperCase()} · SCORE ${zone.severity_score}
       </div>
       <div style="font-size: 11px; color:#9BA1A8; font-family: 'IBM Plex Mono', monospace; margin-top: 2px;">
-        POP: ${zone.population_affected_est.toLocaleString()} · ${zone.disaster_type}
+        POP: ${zone.population_affected_est.toLocaleString()} · ${zone.disaster_type.toUpperCase()}
       </div>
     </div>`;
 }

@@ -25,8 +25,8 @@ export default function Dashboard() {
     {
       id: 'init_dup_1',
       zone_id: 'zone_042',
-      conflict: ['Red Cross Unit 4', 'FEMA Response Team'],
-      need_type: 'medical supplies'
+      conflict: ['NDRF 4th Battalion', 'SDRF Disaster Strike Force'],
+      need_type: 'rescue extrication'
     }
   ]);
   const [resolvingFlag, setResolvingFlag] = useState<DuplicateFlag | null>(null);

@@ -6,9 +6,9 @@ import { cn } from '../lib/utils';
 import { Check } from 'lucide-react';
 
 const AGENCIES = [
-  { id: 'agency_fire_2', name: 'Fire Dept Unit 2' },
-  { id: 'agency_redcross_4', name: 'Red Cross Unit 4' },
-  { id: 'agency_fema', name: 'FEMA Response Team' }
+  { id: 'agency_ndrf_4', name: 'NDRF 4th Battalion' },
+  { id: 'agency_sdrf', name: 'SDRF Disaster Strike Force' },
+  { id: 'agency_ircs', name: 'Indian Red Cross Society' }
 ];
 
 export default function AgencyConsole() {
