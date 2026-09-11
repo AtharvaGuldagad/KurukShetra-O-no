@@ -17,13 +17,8 @@ const queryClient = new QueryClient({
   }
 });
 
-// Stub pages for phases 4–8
-const Inventory = () => (
-  <div className="p-8 text-slate-400">
-    <h2 className="text-xl font-semibold text-slate-200 mb-2">Resource Inventory</h2>
-    <p>Stock management table — Phase 4.</p>
-  </div>
-);
+// Import the real Inventory page (Phase 4)
+import Inventory from './pages/Inventory';
 const AgencyConsole = () => (
   <div className="p-8 text-slate-400">
     <h2 className="text-xl font-semibold text-slate-200 mb-2">Agency Console</h2>

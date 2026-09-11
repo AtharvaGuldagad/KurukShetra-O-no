@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
 import { Truck, CheckCircle2, CircleDashed, ArrowRightCircle } from 'lucide-react';
-import { cn } from '../../lib/utils';
+
 import { type AgencyTask } from '../../api/mockData';
 
 export function AgencyTasksPanel() {

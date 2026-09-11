@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
-import { AlertTriangle, CheckCircle, Package, Clock, ShieldAlert } from 'lucide-react';
+import { CheckCircle, Package, Clock, ShieldAlert } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { type Allocation } from '../../api/mockData';
 

@@ -10,8 +10,8 @@ if (!document.getElementById(STYLE_ID)) {
   style.id = STYLE_ID;
   style.textContent = `
     @keyframes ps20-ping {
-      0%   { transform: scale(1);   opacity: 0.6; }
-      100% { transform: scale(3.5); opacity: 0; }
+      0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.6; }
+      100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
     }
     .ps20-marker-wrap {
       background: transparent !important;
@@ -37,10 +37,12 @@ if (!document.getElementById(STYLE_ID)) {
     }
     .ps20-marker-pulse {
       position: absolute;
-      top: -2px; left: -2px; right: -2px; bottom: -2px; /* cover parent border */
+      top: 50%;
+      left: 50%;
       border-radius: 50%;
       z-index: 1;
       animation: ps20-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+      pointer-events: none;
     }
     .leaflet-tooltip-ps20 {
       background: #1e293b;
@@ -80,13 +82,14 @@ function createZoneIcon(zone: Zone, isSelected: boolean): L.DivIcon {
   const fontSize = baseSize <= 16 ? 8 : 10;
   const shadow = `0 0 ${isSelected ? 14 : 8}px ${color}99`;
   const pulse = zone.priority_tier === 'Critical'
-    ? `<div class="ps20-marker-pulse" style="background:inherit;opacity:0.6;"></div>`
+    ? `<div class="ps20-marker-pulse" style="background:${color};width:${baseSize}px;height:${baseSize}px;"></div>`
     : '';
 
   return L.divIcon({
     className: 'ps20-marker-wrap',
     html: `
       <div class="ps20-marker-inner" style="width:${wrapSize}px;height:${wrapSize}px;">
+        ${pulse}
         <div class="ps20-marker-dot" style="
           width:${baseSize}px;
           height:${baseSize}px;
@@ -95,7 +98,6 @@ function createZoneIcon(zone: Zone, isSelected: boolean): L.DivIcon {
           box-shadow:${shadow};
           font-size:${fontSize}px;
         ">
-          ${pulse}
           <span style="position:relative;z-index:2">${zone.severity_score}</span>
         </div>
       </div>`,
