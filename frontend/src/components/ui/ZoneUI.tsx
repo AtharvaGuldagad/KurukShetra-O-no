@@ -1,133 +1,107 @@
 import { type Zone } from '../../api/mockData';
 import { cn } from '../../lib/utils';
 
-const TIER_CONFIG = {
-  Critical: {
-    bg: 'bg-red-900/60',
-    border: 'border-red-500',
-    text: 'text-red-300',
-    badge: 'bg-red-500 text-white',
-    dot: 'bg-red-500',
-    ring: 'ring-red-500',
-    mapColor: '#ef4444',
-    pulse: 'animate-pulse',
-  },
-  High: {
-    bg: 'bg-orange-900/50',
-    border: 'border-orange-500',
-    text: 'text-orange-300',
-    badge: 'bg-orange-500 text-white',
-    dot: 'bg-orange-500',
-    ring: 'ring-orange-500',
-    mapColor: '#f97316',
-    pulse: '',
-  },
-  Medium: {
-    bg: 'bg-yellow-900/40',
-    border: 'border-yellow-500',
-    text: 'text-yellow-300',
-    badge: 'bg-yellow-500 text-black',
-    dot: 'bg-yellow-400',
-    ring: 'ring-yellow-500',
-    mapColor: '#eab308',
-    pulse: '',
-  },
-  Low: {
-    bg: 'bg-green-900/30',
-    border: 'border-green-600',
-    text: 'text-green-400',
-    badge: 'bg-green-600 text-white',
-    dot: 'bg-green-500',
-    ring: 'ring-green-600',
-    mapColor: '#22c55e',
-    pulse: '',
-  },
-} as const;
-
-export function getTierConfig(tier: Zone['priority_tier']) {
-  return TIER_CONFIG[tier as keyof typeof TIER_CONFIG] ?? TIER_CONFIG.Low;
-}
-
-interface SeverityBadgeProps {
-  tier: Zone['priority_tier'];
-  score?: number;
-  size?: 'sm' | 'md';
-}
-
-export function SeverityBadge({ tier, score, size = 'md' }: SeverityBadgeProps) {
-  const config = getTierConfig(tier);
-  return (
-    <span className={cn(
-      'inline-flex items-center gap-1.5 rounded-full font-semibold tracking-wide',
-      config.badge,
-      size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'
-    )}>
-      {tier === 'Critical' && (
-        <span className="inline-block w-2 h-2 rounded-full bg-white/80 animate-pulse" />
-      )}
-      {tier}
-      {score !== undefined && <span className="opacity-75">({score})</span>}
-    </span>
-  );
-}
-
-interface NeedTagProps {
-  type: string;
-  urgency: 'critical' | 'high' | 'medium' | 'low';
-}
-
-const URGENCY_COLORS = {
-  critical: 'border-red-500 text-red-300 bg-red-950/50',
-  high: 'border-orange-500 text-orange-300 bg-orange-950/50',
-  medium: 'border-yellow-500 text-yellow-300 bg-yellow-950/50',
-  low: 'border-green-600 text-green-400 bg-green-950/30',
+export const SEVERITY_COLORS: Record<Zone['priority_tier'], string> = {
+  Critical: '#C4432E',
+  High:     '#C97A2E',
+  Medium:   '#B8A13A',
+  Low:      '#4C7A5E',
 };
 
-export function NeedTag({ type, urgency }: NeedTagProps) {
+export const SEVERITY_BG_TINTS: Record<Zone['priority_tier'], string> = {
+  Critical: 'rgba(196, 67, 46, 0.15)',
+  High:     'rgba(201, 122, 46, 0.15)',
+  Medium:   'rgba(184, 161, 58, 0.15)',
+  Low:      'rgba(76, 122, 94, 0.15)',
+};
+
+export function getTierColor(tier: Zone['priority_tier']): string {
+  return SEVERITY_COLORS[tier] ?? '#9BA1A8';
+}
+
+export function getTierBgTint(tier: Zone['priority_tier']): string {
+  return SEVERITY_BG_TINTS[tier] ?? 'transparent';
+}
+
+/**
+ * Left-edge 3px severity bar (reads as instrument/rank, not a rounded SaaS badge)
+ */
+export function SeverityEdgeBar({ tier, className }: { tier: Zone['priority_tier']; className?: string }) {
+  const color = getTierColor(tier);
   return (
-    <span className={cn(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium',
-      URGENCY_COLORS[urgency]
-    )}>
-      <span className="capitalize">{type}</span>
-      <span className="opacity-60 text-[10px]">· {urgency}</span>
-    </span>
+    <div
+      className={cn('w-[3px] shrink-0 self-stretch', className)}
+      style={{ backgroundColor: color }}
+      title={`Severity tier: ${tier}`}
+    />
   );
 }
 
-interface ConfidenceBarProps {
-  value: number; // 0–1
-  refs?: string[];
-}
-
-export function ConfidenceBar({ value, refs }: ConfidenceBarProps) {
-  const pct = Math.round(value * 100);
-  const color = value >= 0.85 ? 'bg-green-500' : value >= 0.65 ? 'bg-yellow-500' : 'bg-red-500';
-
+/**
+ * Text-based status indicator with exact operational triage color (no rounded SaaS pills)
+ */
+export function SeverityBadge({ tier, score, size = 'sm' }: { tier: Zone['priority_tier']; score?: number; size?: 'sm' | 'md' }) {
+  const color = getTierColor(tier);
   return (
-    <div className="group relative flex items-center gap-2">
-      <div className="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div
-          className={cn('h-full rounded-full transition-all', color)}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-xs text-slate-400 font-mono">{pct}%</span>
-      {refs && refs.length > 0 && (
-        <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-50 bg-slate-800 border border-slate-600 rounded p-2 shadow-xl min-w-48">
-          <p className="text-xs font-semibold text-slate-300 mb-1">Source Refs:</p>
-          {refs.map((r, i) => (
-            <p key={i} className="text-xs text-slate-400 font-mono break-all">{r}</p>
-          ))}
-        </div>
+    <div className="flex items-center gap-1.5" style={{ color }}>
+      <span
+        className="w-2 h-2 shrink-0"
+        style={{ backgroundColor: color }}
+      />
+      <span className={cn('font-semibold uppercase tracking-tight', size === 'sm' ? 'text-xs' : 'text-sm')}>
+        {tier}
+      </span>
+      {score !== undefined && (
+        <span className="font-mono text-xs opacity-90">
+          [{score}]
+        </span>
       )}
     </div>
   );
 }
 
-export function DisasterTypeIcon({ type }: { type: string }) {
-  const icons: Record<string, string> = {
-    flood: '🌊', earthquake: '⚡', fire: '🔥', landslide: '⛰️', hurricane: '🌀', default: '⚠️'
-  };
-  return <span title={type}>{icons[type] ?? icons.default}</span>;
+/**
+ * Need tag: flat, 1px border, non-decorative
+ */
+export function NeedTag({ type, urgency }: { type: string; urgency: 'critical' | 'high' | 'medium' | 'low' }) {
+  const isCriticalOrHigh = urgency === 'critical' || urgency === 'high';
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs border uppercase tracking-tight',
+        isCriticalOrHigh ? 'border-[#C4432E] text-[#C4432E] bg-[#C4432E]/10' : 'border-[#2A2E33] text-[#9BA1A8] bg-[#171A1D]'
+      )}
+    >
+      <span>{type}</span>
+      <span className="opacity-70 font-mono text-[10px]">· {urgency}</span>
+    </span>
+  );
+}
+
+/**
+ * Confidence bar: dense, rectangular meter
+ */
+export function ConfidenceBar({ value, refs }: { value: number; refs?: string[] }) {
+  const pct = Math.round(value * 100);
+  const barColor = value >= 0.8 ? '#4C7A5E' : value >= 0.6 ? '#B8A13A' : '#C4432E';
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-[#9BA1A8]" title={refs ? `Sources: ${refs.join(', ')}` : undefined}>
+      <div className="w-16 h-1.5 bg-[#0E0F11] border border-[#2A2E33] overflow-hidden">
+        <div
+          className="h-full"
+          style={{ width: `${pct}%`, backgroundColor: barColor }}
+        />
+      </div>
+      <span className="font-mono text-[11px] text-[#E8EAED]">{pct}%</span>
+    </div>
+  );
+}
+
+export function DisasterTypeLabel({ type }: { type: string }) {
+  return (
+    <span className="text-xs uppercase tracking-tight text-[#9BA1A8] font-medium">
+      {type}
+    </span>
+  );
 }

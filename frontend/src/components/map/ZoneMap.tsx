@@ -3,15 +3,14 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { type Zone } from '../../api/mockData';
 
-// Inject global CSS into <head> once — must happen before any icon is created
 const STYLE_ID = 'ps20-map-styles';
 if (!document.getElementById(STYLE_ID)) {
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
-    @keyframes ps20-ping {
-      0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.6; }
-      100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
+    @keyframes ps20-live-pulse {
+      0%   { outline: 3px solid rgba(62, 124, 177, 0.9); outline-offset: 1px; }
+      100% { outline: 0px solid rgba(62, 124, 177, 0); outline-offset: 6px; }
     }
     .ps20-marker-wrap {
       background: transparent !important;
@@ -24,81 +23,73 @@ if (!document.getElementById(STYLE_ID)) {
       justify-content: center;
     }
     .ps20-marker-dot {
-      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 800;
+      font-weight: 600;
       line-height: 1;
-      color: #fff;
-      position: relative;
-      z-index: 2;
-      transition: transform 0.2s ease;
+      color: #E8EAED;
+      font-family: 'IBM Plex Mono', monospace;
+      border-radius: 2px;
+      box-sizing: border-box;
+      user-select: none;
     }
-    .ps20-marker-pulse {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      border-radius: 50%;
-      z-index: 1;
-      animation: ps20-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-      pointer-events: none;
+    .ps20-marker-pulse-active {
+      animation: ps20-live-pulse 600ms ease-out forwards;
     }
     .leaflet-tooltip-ps20 {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: #e2e8f0;
-      border-radius: 6px;
+      background: #171A1D;
+      border: 1px solid #2A2E33;
+      color: #E8EAED;
+      border-radius: 2px;
       font-size: 12px;
-      padding: 6px 10px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
-      font-family: system-ui, sans-serif;
+      padding: 6px 8px;
+      box-shadow: none;
+      font-family: 'Public Sans', sans-serif;
     }
     .leaflet-tooltip-ps20.leaflet-tooltip-top::before {
-      border-top-color: #334155;
+      border-top-color: #2A2E33;
     }
     .leaflet-container {
-      background: #0f172a !important;
+      background: #0E0F11 !important;
+      font-family: 'Public Sans', sans-serif !important;
     }
     .custom-dark-tiles {
-      filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3);
+      filter: brightness(0.55) invert(1) contrast(2.6) hue-rotate(205deg) saturate(0.2);
     }
   `;
   document.head.appendChild(style);
 }
 
 const TIER_COLORS: Record<string, string> = {
-  Critical: '#ef4444',
-  High:     '#f97316',
-  Medium:   '#eab308',
-  Low:      '#22c55e',
+  Critical: '#C4432E',
+  High:     '#C97A2E',
+  Medium:   '#B8A13A',
+  Low:      '#4C7A5E',
 };
 
-function createZoneIcon(zone: Zone, isSelected: boolean): L.DivIcon {
-  const color = TIER_COLORS[zone.priority_tier] ?? '#94a3b8';
-  const baseSize = isSelected ? 22 : 16;
-  const wrapSize = baseSize + 16; // room for pulse ring
-  const borderPx = isSelected ? 3 : 2;
-  const fontSize = baseSize <= 16 ? 8 : 10;
-  const shadow = `0 0 ${isSelected ? 14 : 8}px ${color}99`;
-  const pulse = zone.priority_tier === 'Critical'
-    ? `<div class="ps20-marker-pulse" style="background:${color};width:${baseSize}px;height:${baseSize}px;"></div>`
-    : '';
+function createZoneIcon(zone: Zone, isSelected: boolean, isRecentlyUpdated: boolean): L.DivIcon {
+  const color = TIER_COLORS[zone.priority_tier] ?? '#9BA1A8';
+  
+  // Size slightly by population affected (14px to 22px)
+  const pop = zone.population_affected_est || 1000;
+  const sizeRatio = Math.min(1, Math.max(0, (pop - 1000) / 15000));
+  const baseSize = Math.round(15 + sizeRatio * 7); // 15 to 22px
+  const wrapSize = baseSize + 12;
+  const pulseClass = isRecentlyUpdated ? 'ps20-marker-pulse-active' : '';
 
   return L.divIcon({
     className: 'ps20-marker-wrap',
     html: `
       <div class="ps20-marker-inner" style="width:${wrapSize}px;height:${wrapSize}px;">
-        ${pulse}
-        <div class="ps20-marker-dot" style="
+        <div class="ps20-marker-dot ${pulseClass}" style="
           width:${baseSize}px;
           height:${baseSize}px;
           background:${color};
-          border:${borderPx}px solid ${isSelected ? '#ffffff' : 'rgba(255,255,255,0.55)'};
-          box-shadow:${shadow};
-          font-size:${fontSize}px;
+          border:${isSelected ? '2px solid #E8EAED' : '1px solid rgba(0,0,0,0.6)'};
+          font-size:${baseSize <= 16 ? 9 : 10}px;
         ">
-          <span style="position:relative;z-index:2">${zone.severity_score}</span>
+          <span>${zone.severity_score}</span>
         </div>
       </div>`,
     iconSize:   [wrapSize, wrapSize],
@@ -122,11 +113,10 @@ export default function ZoneMap({
   const mapRef       = useRef<HTMLDivElement>(null);
   const mapInstance  = useRef<L.Map | null>(null);
   const markers      = useRef<Map<string, L.Marker>>(new Map());
-  // Keep a stable ref to the callback to avoid re-creating markers on every render
   const onSelectRef  = useRef(onSelectZone);
   onSelectRef.current = onSelectZone;
 
-  // --- Init map once ---
+  // Init map once
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
@@ -134,13 +124,12 @@ export default function ZoneMap({
       center: [34.052, -118.250],
       zoom: 12,
       zoomControl: true,
-      attributionControl: true,
+      attributionControl: false,
     });
 
     L.tileLayer(
       'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       {
-        attribution: '&copy; OpenStreetMap contributors',
         subdomains: 'abc',
         maxZoom: 19,
         className: 'custom-dark-tiles',
@@ -156,7 +145,7 @@ export default function ZoneMap({
     };
   }, []);
 
-  // --- Sync markers ---
+  // Sync markers
   useEffect(() => {
     const map = mapInstance.current;
     if (!map) return;
@@ -174,14 +163,14 @@ export default function ZoneMap({
     // Upsert markers
     zones.forEach(zone => {
       const isSelected = zone.zone_id === selectedZoneId;
-      const icon = createZoneIcon(zone, isSelected);
+      const isRecentlyUpdated = recentlyUpdated.has(zone.zone_id);
+      const icon = createZoneIcon(zone, isSelected, isRecentlyUpdated);
       const latlng: L.LatLngTuple = [zone.location.lat, zone.location.lng];
 
       const existing = markers.current.get(zone.zone_id);
       if (existing) {
         existing.setIcon(icon);
         existing.setLatLng(latlng);
-        // Refresh tooltip content (score / tier may have changed)
         existing.setTooltipContent(buildTooltip(zone));
       } else {
         const m = L.marker(latlng, { icon })
@@ -197,35 +186,35 @@ export default function ZoneMap({
       }
     });
 
-    // Fly to selected zone
     if (selectedZoneId) {
       const z = zones.find(z => z.zone_id === selectedZoneId);
-      if (z) map.flyTo([z.location.lat, z.location.lng], 14, { duration: 0.7 });
+      if (z) map.flyTo([z.location.lat, z.location.lng], 13, { duration: 0.5 });
     }
   }, [zones, selectedZoneId, recentlyUpdated]);
 
   return (
-    <div className="relative w-full h-full">
-      <div ref={mapRef} className="w-full h-full rounded-lg" />
-      {recentlyUpdated.size > 0 && (
-        <div className="absolute top-3 left-3 z-[1000] pointer-events-none
-          bg-blue-900/70 border border-blue-400 rounded-lg px-3 py-1.5
-          text-xs text-blue-200 font-medium flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-          Live update received
-        </div>
-      )}
+    <div className="relative w-full h-full bg-[#0E0F11]">
+      <div ref={mapRef} className="w-full h-full" />
+      <div className="absolute bottom-2 left-2 z-[500] bg-[#171A1D] border border-[#2A2E33] px-2 py-1 text-[11px] text-[#9BA1A8] flex items-center gap-3">
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-[#C4432E]" /> Critical</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-[#C97A2E]" /> High</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-[#B8A13A]" /> Medium</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-[#4C7A5E]" /> Low</span>
+      </div>
     </div>
   );
 }
 
 function buildTooltip(zone: Zone): string {
-  const color = TIER_COLORS[zone.priority_tier] ?? '#94a3b8';
+  const color = TIER_COLORS[zone.priority_tier] ?? '#9BA1A8';
   return `
-    <div>
-      <strong style="color:#f1f5f9">${zone.location.name}</strong><br>
-      <span style="color:${color};font-weight:600">${zone.priority_tier}</span>
-      &nbsp;·&nbsp;Score: <strong>${zone.severity_score}</strong><br>
-      <span style="color:#94a3b8">${zone.disaster_type} · ${zone.population_affected_est.toLocaleString()} affected</span>
+    <div style="font-family: 'Public Sans', sans-serif;">
+      <div style="font-weight: 600; color:#E8EAED;">${zone.location.name}</div>
+      <div style="font-size: 11px; margin-top: 2px; color: ${color}; font-weight: 600;">
+        ${zone.priority_tier.toUpperCase()} · SCORE ${zone.severity_score}
+      </div>
+      <div style="font-size: 11px; color:#9BA1A8; font-family: 'IBM Plex Mono', monospace; margin-top: 2px;">
+        POP: ${zone.population_affected_est.toLocaleString()} · ${zone.disaster_type}
+      </div>
     </div>`;
 }

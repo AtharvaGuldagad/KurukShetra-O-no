@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronUp, ChevronDown, Package, Truck, Activity } from 'lucide-react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { AllocationPanel } from './AllocationPanel';
 import { AgencyTasksPanel } from './AgencyTasksPanel';
@@ -11,61 +11,61 @@ export function BottomDock() {
   return (
     <div 
       className={cn(
-        "absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700 flex flex-col transition-all duration-300 ease-in-out shadow-2xl",
-        isOpen ? "h-72" : "h-10"
+        "absolute bottom-0 left-0 right-0 bg-[#171A1D] border-t border-[#2A2E33] flex flex-col transition-all duration-150 ease-out",
+        isOpen ? "h-64" : "h-9"
       )}
-      style={{ zIndex: 9999 }}
+      style={{ zIndex: 1000 }}
     >
-      {/* Dock Header / Handle */}
+      {/* Dock Header */}
       <div 
-        className="h-10 flex items-center justify-between px-4 bg-slate-800/80 cursor-pointer shrink-0 hover:bg-slate-700/80 transition-colors"
+        className="h-9 flex items-center justify-between px-3 bg-[#1E2226] border-b border-[#2A2E33] cursor-pointer shrink-0 select-none"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 text-slate-300 font-semibold text-sm">
-            <Activity className="w-4 h-4 text-blue-400" />
-            Resource Operations
-          </div>
+        <div className="flex items-center gap-4">
+          <span className="text-xs font-bold uppercase tracking-tight text-[#E8EAED]">
+            Operations Console
+          </span>
           
           {isOpen && (
-            <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
               <button 
                 onClick={() => setActiveTab('allocations')}
                 className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-t-md transition-colors flex items-center gap-1.5",
+                  "px-2.5 py-1 text-xs uppercase tracking-tight font-medium border-b-2 transition-none",
                   activeTab === 'allocations' 
-                    ? "bg-slate-900 text-blue-400 border-t border-x border-slate-700 translate-y-[1px]" 
-                    : "text-slate-500 hover:text-slate-300"
+                    ? "border-[#3E7CB1] text-[#E8EAED] bg-[#171A1D]" 
+                    : "border-transparent text-[#9BA1A8] hover:text-[#E8EAED]"
                 )}
               >
-                <Package className="w-3.5 h-3.5" />
-                Allocations
+                Resource Allocations
               </button>
               <button 
                 onClick={() => setActiveTab('tasks')}
                 className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-t-md transition-colors flex items-center gap-1.5",
+                  "px-2.5 py-1 text-xs uppercase tracking-tight font-medium border-b-2 transition-none",
                   activeTab === 'tasks' 
-                    ? "bg-slate-900 text-blue-400 border-t border-x border-slate-700 translate-y-[1px]" 
-                    : "text-slate-500 hover:text-slate-300"
+                    ? "border-[#3E7CB1] text-[#E8EAED] bg-[#171A1D]" 
+                    : "border-transparent text-[#9BA1A8] hover:text-[#E8EAED]"
                 )}
               >
-                <Truck className="w-3.5 h-3.5" />
-                Agency Tasks
+                Agency Assignments
               </button>
             </div>
           )}
         </div>
 
-        <button className="p-1 text-slate-400 hover:text-slate-200 transition-colors rounded hover:bg-slate-600">
-          {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+        <button 
+          className="p-1 text-[#9BA1A8] hover:text-[#E8EAED] transition-none"
+          aria-label={isOpen ? "Collapse panel" : "Expand panel"}
+        >
+          {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
         </button>
       </div>
 
       {/* Dock Content */}
       <div className={cn(
-        "flex-1 overflow-hidden transition-opacity duration-300 flex",
-        isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        "flex-1 overflow-hidden flex",
+        isOpen ? "block" : "hidden"
       )}>
         {activeTab === 'allocations' ? <AllocationPanel /> : <AgencyTasksPanel />}
       </div>

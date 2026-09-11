@@ -5,18 +5,12 @@ import { socket } from '../api/socket';
 import { type Zone } from '../api/mockData';
 import { ZoneList } from '../components/dashboard/ZoneList';
 import { ZoneDetailPanel } from '../components/dashboard/ZoneDetailPanel';
-
-import { Activity, Map as MapIcon, List, RefreshCw, AlertCircle, AlertTriangle } from 'lucide-react';
-import { cn } from '../lib/utils';
-
-// Lazy import the map to avoid SSR/leaflet issues
 import ZoneMap from '../components/map/ZoneMap';
 import { BottomDock } from '../components/dashboard/BottomDock';
-import { ReallocationModal, type ReallocationPlan } from '../components/dashboard/ReallocationModal';
+import { ReallocationTimelineModal, type ReallocationPlan } from './ReallocationTimeline';
+import { AlertTriangle, X } from 'lucide-react';
 
-const UPDATE_FLASH_DURATION = 4000; // ms to show "just updated" indicator
-
-interface DuplicateFlag {
+export interface DuplicateFlag {
   id: string;
   zone_id: string;
   conflict: string[];
@@ -27,15 +21,21 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [recentlyUpdated, setRecentlyUpdated] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<'split' | 'map' | 'list'>('split');
-  const [wsEvents, setWsEvents] = useState<string[]>([]);
-  const [duplicateFlags, setDuplicateFlags] = useState<DuplicateFlag[]>([]);
+  const [duplicateFlags, setDuplicateFlags] = useState<DuplicateFlag[]>([
+    {
+      id: 'init_dup_1',
+      zone_id: 'zone_042',
+      conflict: ['Red Cross Unit 4', 'FEMA Response Team'],
+      need_type: 'medical supplies'
+    }
+  ]);
+  const [resolvingFlag, setResolvingFlag] = useState<DuplicateFlag | null>(null);
   const [reallocationPlan, setReallocationPlan] = useState<ReallocationPlan | null>(null);
 
-  const { data: zones = [], isLoading, error, isFetching } = useQuery<Zone[]>({
+  const { data: zones = [], isLoading, error } = useQuery<Zone[]>({
     queryKey: ['zones'],
     queryFn: apiClient.getZones,
-    staleTime: 1000 * 60 * 5, // zones only refresh on WS event or manual trigger
+    staleTime: 1000 * 60 * 5,
   });
 
   const flashZone = useCallback((zoneId: string) => {
@@ -50,13 +50,12 @@ export default function Dashboard() {
         next.delete(zoneId);
         return next;
       });
-    }, UPDATE_FLASH_DURATION);
+    }, 600); // 600ms per Part 8 Motion Rules
   }, []);
 
-  // Wire WebSocket events
+  // WebSocket listeners
   useEffect(() => {
     const onZoneUpdated = (updatedZone: Zone) => {
-      // Directly update the React Query cache — no refetch needed
       queryClient.setQueryData<Zone[]>(['zones'], (old = []) => {
         const exists = old.some(z => z.zone_id === updatedZone.zone_id);
         const next = exists
@@ -65,7 +64,6 @@ export default function Dashboard() {
         return next.sort((a, b) => b.severity_score - a.severity_score);
       });
       flashZone(updatedZone.zone_id);
-      setWsEvents(prev => [`ZoneUpdated: ${updatedZone.location?.name ?? updatedZone.zone_id}`, ...prev.slice(0, 4)]);
     };
 
     const onAllocationRecalculated = (data: any) => {
@@ -74,20 +72,17 @@ export default function Dashboard() {
       } else {
         queryClient.invalidateQueries({ queryKey: ['allocations'] });
       }
-      setWsEvents(prev => [`AllocationRecalculated: ${data.reason ?? 'triggered'}`, ...prev.slice(0, 4)]);
     };
 
-    const onAgencyStatusChanged = (data: any) => {
+    const onAgencyStatusChanged = () => {
       queryClient.invalidateQueries({ queryKey: ['agency-tasks'] });
-      setWsEvents(prev => [`AgencyStatusChanged: ${data.agency_name ?? data.agency_id}`, ...prev.slice(0, 4)]);
     };
 
     const onDuplicateFlagged = (data: { zone_id: string; conflict: string[]; need_type: string }) => {
       setDuplicateFlags(prev => [
-        { id: Math.random().toString(36).substring(2, 11), ...data },
+        { id: Math.random().toString(36).substring(2, 9), ...data },
         ...prev
       ]);
-      setWsEvents(prev => [`DuplicateFlagged: ${data.zone_id}`, ...prev.slice(0, 4)]);
     };
 
     socket.on('ZoneUpdated', onZoneUpdated);
@@ -111,17 +106,17 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-red-400 gap-2">
-        <AlertCircle className="w-5 h-5" />
-        <p>Failed to load zones. Check your connection.</p>
+      <div className="p-8 text-xs font-mono text-[#C4432E] bg-[#0E0F11]">
+        ERROR: Failed to connect to telemetry service.
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-[#0E0F11]">
+      {/* Reallocation Plan Modal / Diff View */}
       {reallocationPlan && (
-        <ReallocationModal
+        <ReallocationTimelineModal
           plan={reallocationPlan}
           onClose={(accepted) => {
             setReallocationPlan(null);
@@ -132,161 +127,168 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Status bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-800/80 border-b border-slate-700 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs text-slate-400 font-medium">LIVE</span>
+      {/* Duplicate conflict resolution side-by-side modal */}
+      {resolvingFlag && (
+        <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-[#171A1D] border border-[#2A2E33] w-full max-w-2xl p-4 text-[#E8EAED]">
+            <div className="flex items-center justify-between border-b border-[#2A2E33] pb-2 mb-3">
+              <span className="text-xs font-bold uppercase tracking-tight text-[#C97A2E]">
+                Resolve Assignment Conflict — Zone {resolvingFlag.zone_id}
+              </span>
+              <button onClick={() => setResolvingFlag(null)} className="text-[#9BA1A8] hover:text-[#E8EAED]">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#9BA1A8] mb-4">
+              Select which agency retains primary responsibility for <strong className="text-[#E8EAED]">{resolvingFlag.need_type}</strong> in this zone. The second agency will be freed for reassignment.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {resolvingFlag.conflict.map((agency, idx) => (
+                <div key={idx} className="border border-[#2A2E33] bg-[#0E0F11] p-3 flex flex-col justify-between">
+                  <div>
+                    <div className="font-semibold text-sm text-[#E8EAED]">{agency}</div>
+                    <div className="text-xs text-[#9BA1A8] mt-1">Assigned: {resolvingFlag.need_type}</div>
+                    <div className="font-mono text-[11px] text-[#9BA1A8] mt-0.5">Status: Deployed</div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setDuplicateFlags(prev => prev.filter(f => f.id !== resolvingFlag.id));
+                      setResolvingFlag(null);
+                    }}
+                    className="mt-4 px-3 py-1.5 bg-[#1E2226] border border-[#3E7CB1] text-[#E8EAED] hover:bg-[#3E7CB1] text-xs uppercase tracking-tight transition-none text-center"
+                  >
+                    Assign Primary & Reassign Other
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-[#2A2E33]">
+              <button
+                onClick={() => setResolvingFlag(null)}
+                className="px-3 py-1 text-xs text-[#9BA1A8] hover:text-[#E8EAED]"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-          <StatPill label="Critical" value={criticalCount} color="text-red-400" />
-          <StatPill label="High" value={highCount} color="text-orange-400" />
-          <StatPill label="Casualties" value={totalCasualties} color="text-red-300" />
-          <StatPill label="Zones" value={zones.length} color="text-slate-300" />
+        </div>
+      )}
+
+      {/* Instrumentation Sub-header Status Bar */}
+      <div className="h-9 px-3 flex items-center justify-between border-b border-[#2A2E33] bg-[#171A1D] shrink-0 select-none">
+        <div className="flex items-center gap-4 text-xs">
+          <span className="font-semibold uppercase tracking-tight text-[#E8EAED]">
+            Coordination Console
+          </span>
+
+          <span className="text-[#2A2E33]">|</span>
+
+          <div className="flex items-center gap-3 font-mono text-[11px]">
+            <span className="text-[#9BA1A8]">
+              CRITICAL: <strong className="text-[#C4432E]">{criticalCount}</strong>
+            </span>
+            <span className="text-[#9BA1A8]">
+              HIGH: <strong className="text-[#C97A2E]">{highCount}</strong>
+            </span>
+            <span className="text-[#9BA1A8]">
+              CASUALTIES: <strong className="text-[#E8EAED]">{totalCasualties}</strong>
+            </span>
+            <span className="text-[#9BA1A8]">
+              ZONES: <strong className="text-[#E8EAED]">{zones.length}</strong>
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Live event feed */}
-          {wsEvents.length > 0 && (
-            <div className="hidden lg:flex items-center gap-1.5 text-xs text-blue-400 bg-blue-950/50 border border-blue-800 rounded px-2 py-1">
-              <Activity className="w-3 h-3 shrink-0" />
-              <span className="truncate max-w-48">{wsEvents[0]}</span>
-            </div>
-          )}
-
-          {isFetching && (
-            <RefreshCw className="w-3.5 h-3.5 text-slate-500 animate-spin" />
-          )}
-
-          {/* View toggle */}
-          <div className="flex rounded-lg border border-slate-700 overflow-hidden text-xs">
-            {(['split', 'map', 'list'] as const).map(mode => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={cn(
-                  'px-3 py-1.5 flex items-center gap-1.5 transition-colors',
-                  viewMode === mode
-                    ? 'bg-slate-600 text-white'
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                )}
-              >
-                {mode === 'map' && <MapIcon className="w-3 h-3" />}
-                {mode === 'list' && <List className="w-3 h-3" />}
-                <span className="capitalize">{mode}</span>
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-3 text-xs text-[#9BA1A8]">
+          <span className="font-mono text-[11px]">
+            EPSG:4326 · 100% SIGNAL
+          </span>
         </div>
       </div>
 
-      {/* Main content area */}
+      {/* Part 5: Docked Banner at top of panel in severity-high color */}
+      {duplicateFlags.length > 0 && (
+        <div className="border-b border-[#2A2E33] bg-[#C97A2E]/10 border-l-4 border-l-[#C97A2E] p-2.5 px-3 flex items-center justify-between shrink-0 slide-down-alert">
+          <div className="flex items-center gap-2 text-xs">
+            <AlertTriangle className="w-4 h-4 text-[#C97A2E] shrink-0" />
+            <span className="text-[#E8EAED]">
+              <strong className="text-[#C97A2E]">Duplicate Effort:</strong>{' '}
+              {duplicateFlags[0].conflict.join(' and ')} both assigned to Zone {duplicateFlags[0].zone_id} — {duplicateFlags[0].need_type}.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setDuplicateFlags(prev => prev.slice(1))}
+              className="px-2.5 py-1 text-xs uppercase tracking-tight bg-[#171A1D] border border-[#2A2E33] hover:border-[#9BA1A8] text-[#9BA1A8] hover:text-[#E8EAED] transition-none"
+            >
+              Keep both
+            </button>
+            <button
+              onClick={() => setResolvingFlag(duplicateFlags[0])}
+              className="px-2.5 py-1 text-xs uppercase tracking-tight bg-[#C97A2E] text-[#0E0F11] font-semibold transition-none"
+            >
+              Resolve
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Two-Column Layout: Left Map (~60%), Right Ranked Zone List (~40%) */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* DUPLICATE FLAGS PANEL */}
-        {duplicateFlags.length > 0 && (
-          <div className="absolute top-4 right-4 z-[2000] flex flex-col gap-2 w-80 pointer-events-none">
-            {duplicateFlags.map(flag => (
-              <div key={flag.id} className="bg-slate-800 border border-yellow-500/50 rounded-lg p-3 shadow-lg pointer-events-auto flex flex-col gap-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-1.5 text-yellow-500">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span className="font-semibold text-sm">Duplicate Effort</span>
-                  </div>
-                  <button 
-                    onClick={() => setDuplicateFlags(prev => prev.filter(f => f.id !== flag.id))}
-                    className="text-xs text-slate-400 hover:text-white bg-slate-700 hover:bg-slate-600 px-2 py-0.5 rounded transition-colors"
-                  >
-                    Resolve
-                  </button>
-                </div>
-                <div className="text-xs text-slate-300 mt-1">
-                  <span className="text-slate-400 font-medium">Zone:</span> {flag.zone_id} <br/>
-                  <span className="text-slate-400 font-medium">Need:</span> {flag.need_type}
-                </div>
-                <div className="text-xs font-medium text-slate-200 bg-slate-900/50 p-1.5 rounded mt-1">
-                  Conflicting Agencies:
-                  <ul className="list-disc pl-4 mt-1 text-red-300">
-                    {flag.conflict.map((c, i) => <li key={i}>{c}</li>)}
-                  </ul>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Zone list sidebar */}
-        {(viewMode === 'split' || viewMode === 'list') && (
-          <div className="w-72 xl:w-80 shrink-0 flex flex-col border-r border-slate-700 bg-slate-900/50 overflow-hidden">
-            <div className="px-3 py-2 border-b border-slate-800 shrink-0">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Priority Zones ({zones.length})
-              </p>
+        {/* Left Map: 60% */}
+        <div className="w-[60%] h-full overflow-hidden border-r border-[#2A2E33]">
+          {isLoading ? (
+            <div className="w-full h-full bg-[#0E0F11] flex items-center justify-center font-mono text-xs text-[#9BA1A8]">
+              INITIALIZING CARTOGRAPHY TELEMETRY...
             </div>
-            <div className="flex-1 overflow-hidden px-2 py-2">
-              {isLoading ? (
-                <ZoneListSkeleton />
-              ) : (
-                <ZoneList
-                  zones={zones}
-                  selectedZoneId={selectedZoneId}
-                  recentlyUpdated={recentlyUpdated}
-                  onSelectZone={id => setSelectedZoneId(prev => prev === id ? null : id)}
-                />
-              )}
-            </div>
-          </div>
-        )}
+          ) : (
+            <ZoneMap
+              zones={zones}
+              selectedZoneId={selectedZoneId}
+              recentlyUpdated={recentlyUpdated}
+              onSelectZone={id => setSelectedZoneId(prev => prev === id ? null : id)}
+            />
+          )}
+        </div>
 
-        {/* Map area */}
-        {(viewMode === 'split' || viewMode === 'map') && (
+        {/* Right Ranked Zone List: 40% */}
+        <div className="w-[40%] h-full flex flex-col overflow-hidden bg-[#171A1D]">
+          <div className="p-2 px-3 border-b border-[#2A2E33] bg-[#1E2226] flex items-center justify-between shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-tight text-[#9BA1A8]">
+              Ranked Zone Triage ({zones.length})
+            </span>
+            <span className="text-[11px] font-mono text-[#9BA1A8]">
+              BY SEVERITY
+            </span>
+          </div>
+
           <div className="flex-1 overflow-hidden">
-            {isLoading ? (
-              <div className="w-full h-full bg-slate-900 flex items-center justify-center text-slate-500">
-                Loading map…
-              </div>
-            ) : (
-              <ZoneMap
-                zones={zones}
-                selectedZoneId={selectedZoneId}
-                recentlyUpdated={recentlyUpdated}
-                onSelectZone={id => setSelectedZoneId(prev => prev === id ? null : id)}
-              />
-            )}
+            <ZoneList
+              zones={zones}
+              selectedZoneId={selectedZoneId}
+              recentlyUpdated={recentlyUpdated}
+              onSelectZone={id => setSelectedZoneId(prev => prev === id ? null : id)}
+            />
           </div>
-        )}
+        </div>
 
-        {/* Detail panel */}
+        {/* Zone Detail Inspector Drawer (if selected) */}
         {selectedZone && (
-          <div className="w-80 xl:w-96 shrink-0 border-l border-slate-700 overflow-hidden">
+          <div className="absolute top-0 right-0 bottom-0 w-80 lg:w-96 z-40 shadow-none">
             <ZoneDetailPanel
               zone={selectedZone}
               onClose={() => setSelectedZoneId(null)}
             />
           </div>
         )}
-        
-        {/* Bottom Dock for Resource Operations */}
+
+        {/* Docked Resource Operations Panel at bottom */}
         <BottomDock />
       </div>
-    </div>
-  );
-}
-
-function StatPill({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="flex items-baseline gap-1">
-      <span className={cn('text-sm font-bold tabular-nums', color)}>{value}</span>
-      <span className="text-xs text-slate-500">{label}</span>
-    </div>
-  );
-}
-
-function ZoneListSkeleton() {
-  return (
-    <div className="space-y-2 px-1">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-24 rounded-lg bg-slate-800/60 animate-pulse" />
-      ))}
     </div>
   );
 }

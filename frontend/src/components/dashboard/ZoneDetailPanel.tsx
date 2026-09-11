@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
 import { type Zone } from '../../api/mockData';
-import { SeverityBadge, NeedTag, ConfidenceBar, DisasterTypeIcon } from '../ui/ZoneUI';
-import { getTierConfig } from '../ui/ZoneUI';
+import { SeverityBadge, NeedTag, ConfidenceBar, SeverityEdgeBar } from '../ui/ZoneUI';
 import { cn } from '../../lib/utils';
-import { X, Users, AlertTriangle, TrendingUp, ChevronDown, ChevronUp, Activity } from 'lucide-react';
+import { X, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ZoneDetailPanelProps {
   zone: Zone;
@@ -14,7 +13,6 @@ interface ZoneDetailPanelProps {
 
 export function ZoneDetailPanel({ zone, onClose }: ZoneDetailPanelProps) {
   const [showRaw, setShowRaw] = useState(false);
-  const config = getTierConfig(zone.priority_tier);
 
   const { data: history, isLoading: histLoading } = useQuery({
     queryKey: ['zone-history', zone.zone_id],
@@ -22,140 +20,123 @@ export function ZoneDetailPanel({ zone, onClose }: ZoneDetailPanelProps) {
   });
 
   return (
-    <div className={cn(
-      'flex flex-col h-full bg-slate-900 border-l border-slate-700 overflow-hidden',
-    )}>
+    <div className="flex flex-col h-full bg-[#171A1D] border-l border-[#2A2E33] overflow-hidden text-[#E8EAED]">
       {/* Header */}
-      <div className={cn('p-4 border-b border-slate-700 bg-slate-800/50', config.bg)}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <DisasterTypeIcon type={zone.disaster_type} />
-            <div className="min-w-0">
-              <h2 className="text-base font-bold text-slate-100 truncate">{zone.location.name}</h2>
-              <p className="text-xs text-slate-400 capitalize">{zone.disaster_type} · {zone.zone_id}</p>
+      <div className="flex items-stretch border-b border-[#2A2E33] bg-[#1E2226]">
+        <SeverityEdgeBar tier={zone.priority_tier} />
+        <div className="flex-1 p-3 flex items-start justify-between gap-2 min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-[#E8EAED] truncate leading-tight">
+                {zone.location.name}
+              </h2>
+              <span className="font-mono text-xs text-[#9BA1A8]">[{zone.zone_id}]</span>
+            </div>
+            <p className="text-xs text-[#9BA1A8] mt-0.5 uppercase tracking-tight">
+              {zone.disaster_type} · LAT {zone.location.lat.toFixed(4)}, LNG {zone.location.lng.toFixed(4)}
+            </p>
+            <div className="mt-2 flex items-center gap-3">
+              <SeverityBadge tier={zone.priority_tier} score={zone.severity_score} />
+              {zone.deterioration_delta && zone.deterioration_delta !== 'stable' && (
+                <span className="text-xs font-mono text-[#C97A2E]">
+                  Δ {zone.deterioration_delta}
+                </span>
+              )}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-300 transition-colors shrink-0 p-1"
+            className="text-[#9BA1A8] hover:text-[#E8EAED] p-1 transition-none"
+            aria-label="Close inspector"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 items-center">
-          <SeverityBadge tier={zone.priority_tier} score={zone.severity_score} />
-          {zone.deterioration_delta !== 'stable' && (
-            <span className="flex items-center gap-1 text-orange-400 text-xs font-medium">
-              <TrendingUp className="w-3 h-3" /> {zone.deterioration_delta}
-            </span>
-          )}
-        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard
-            icon={<Users className="w-4 h-4 text-blue-400" />}
-            label="Population Affected"
-            value={zone.population_affected_est.toLocaleString()}
-          />
-          <StatCard
-            icon={<AlertTriangle className="w-4 h-4 text-red-400" />}
-            label="Casualties"
-            value={String(zone.casualties)}
-            highlight={zone.casualties > 0}
-          />
-        </div>
-
-        {/* Needs */}
-        <Section title="Unmet Needs">
-          <div className="flex flex-wrap gap-2">
-            {zone.needs.map((n, i) => (
-              <NeedTag key={i} type={n.type} urgency={n.urgency} />
-            ))}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Core telemetry table */}
+        <div className="border border-[#2A2E33] bg-[#0E0F11]">
+          <div className="grid grid-cols-2 divide-x divide-[#2A2E33] border-b border-[#2A2E33]">
+            <div className="p-2.5">
+              <span className="text-xs text-[#9BA1A8] block">Population Affected</span>
+              <span className="font-mono text-base font-semibold text-[#E8EAED]">
+                {zone.population_affected_est.toLocaleString()}
+              </span>
+            </div>
+            <div className="p-2.5">
+              <span className="text-xs text-[#9BA1A8] block">Casualties</span>
+              <span className={cn('font-mono text-base font-semibold', zone.casualties > 0 ? 'text-[#C4432E]' : 'text-[#E8EAED]')}>
+                {zone.casualties}
+              </span>
+            </div>
           </div>
-        </Section>
-
-        {/* Source Confidence */}
-        <Section title="Source Confidence">
-          <div className="flex flex-col gap-2">
+          <div className="p-2.5">
+            <span className="text-xs text-[#9BA1A8] block mb-1">Source Confidence & Verification</span>
             <ConfidenceBar value={zone.source_confidence} refs={zone.source_refs} />
-            <div className="mt-1 space-y-1">
-              {zone.source_refs.map((r, i) => (
-                <div key={i} className="text-xs font-mono text-slate-400 bg-slate-800 rounded px-2 py-1 break-all">{r}</div>
+            <div className="mt-2 space-y-1">
+              {zone.source_refs.map((ref, i) => (
+                <div key={i} className="font-mono text-[11px] text-[#9BA1A8] bg-[#171A1D] px-2 py-1 border border-[#2A2E33] truncate">
+                  {ref}
+                </div>
               ))}
             </div>
           </div>
-        </Section>
+        </div>
 
-        {/* Zone History */}
-        <Section title="Zone State History">
+        {/* Needs section */}
+        <div>
+          <h3 className="text-xs font-semibold text-[#9BA1A8] uppercase tracking-tight mb-2">
+            Identified Needs ({zone.needs.length})
+          </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {zone.needs.map((need, i) => (
+              <NeedTag key={i} type={need.type} urgency={need.urgency} />
+            ))}
+          </div>
+        </div>
+
+        {/* State Log History */}
+        <div>
+          <h3 className="text-xs font-semibold text-[#9BA1A8] uppercase tracking-tight mb-2">
+            Status Progression
+          </h3>
           {histLoading ? (
-            <div className="text-xs text-slate-500 animate-pulse">Loading history…</div>
+            <div className="text-xs font-mono text-[#9BA1A8]">Loading state log…</div>
           ) : (
-            <div className="relative pl-4 border-l border-slate-700 space-y-3">
+            <div className="border border-[#2A2E33] divide-y divide-[#2A2E33] text-xs">
               {(history || []).map((h, i) => (
-                <div key={i} className="relative">
-                  <div className="absolute -left-[1.3rem] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 border border-slate-500" />
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs text-slate-300 font-medium">
-                        Score: {h.severity_score} · {h.priority_tier}
-                      </p>
-                      {h.note && <p className="text-xs text-slate-500 mt-0.5">{h.note}</p>}
-                    </div>
-                    <p className="text-xs text-slate-600 shrink-0">
-                      {new Date(h.timestamp).toLocaleTimeString()}
-                    </p>
+                <div key={i} className="p-2 flex items-center justify-between bg-[#0E0F11]">
+                  <div>
+                    <span className="font-semibold text-[#E8EAED]">{h.priority_tier}</span>
+                    <span className="font-mono text-[#9BA1A8] ml-2">Score {h.severity_score}</span>
+                    {h.note && <span className="text-[#9BA1A8] block mt-0.5">{h.note}</span>}
                   </div>
+                  <span className="font-mono text-[11px] text-[#9BA1A8]">
+                    {new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
                 </div>
               ))}
             </div>
           )}
-        </Section>
+        </div>
 
-        {/* Raw payload toggle */}
-        <div>
+        {/* Technical Raw Payload */}
+        <div className="pt-2 border-t border-[#2A2E33]">
           <button
-            onClick={() => setShowRaw(v => !v)}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            onClick={() => setShowRaw(!showRaw)}
+            className="flex items-center gap-1.5 text-xs text-[#9BA1A8] hover:text-[#E8EAED]"
           >
-            {showRaw ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            Raw payload
+            {showRaw ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            <span>Diagnostic Payload</span>
           </button>
           {showRaw && (
-            <pre className="mt-2 text-xs text-slate-400 bg-slate-800/80 rounded p-3 overflow-auto max-h-48 border border-slate-700">
+            <pre className="mt-2 text-[11px] font-mono text-[#9BA1A8] bg-[#0E0F11] border border-[#2A2E33] p-2 overflow-x-auto max-h-40">
               {JSON.stringify(zone, null, 2)}
             </pre>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value, highlight }: {
-  icon: React.ReactNode; label: string; value: string; highlight?: boolean;
-}) {
-  return (
-    <div className="bg-slate-800/60 border border-slate-700 rounded-lg p-3">
-      <div className="flex items-center gap-1.5 mb-1">
-        {icon}
-        <span className="text-xs text-slate-400">{label}</span>
-      </div>
-      <p className={cn('text-lg font-bold', highlight ? 'text-red-400' : 'text-slate-100')}>{value}</p>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-        <Activity className="w-3 h-3" /> {title}
-      </h3>
-      {children}
     </div>
   );
 }

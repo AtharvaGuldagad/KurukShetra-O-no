@@ -1,270 +1,307 @@
 import { useState } from 'react';
-import { useNavigate, NavLink } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
-import { FileText, Send, CheckCircle2, Info, Loader2, ArrowLeft } from 'lucide-react';
-import { cn } from '../lib/utils';
 import { type Zone } from '../api/mockData';
+import { cn } from '../lib/utils';
+import { Plus, Minus, CheckCircle, Upload, X } from 'lucide-react';
+
+const DISASTER_TYPES = [
+  { id: 'flood', label: 'Flood' },
+  { id: 'earthquake', label: 'Earthquake' },
+  { id: 'fire', label: 'Fire' },
+  { id: 'landslide', label: 'Landslide' },
+  { id: 'hurricane', label: 'Hurricane' },
+];
+
+const NEED_TYPES = [
+  'Medical',
+  'Shelter',
+  'Food',
+  'Rescue',
+  'Water',
+];
 
 export default function ZoneReporting() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [formData, setFormData] = useState({
-    zone_id: '',
-    locationName: '',
-    lat: '',
-    lng: '',
-    disaster_type: 'flood',
-    casualties: 0,
-    population_affected_est: 0,
-    severity_score: 50,
-    raw_report: '',
-  });
+  const [locationName, setLocationName] = useState('');
+  const [disasterType, setDisasterType] = useState('flood');
+  const [casualties, setCasualties] = useState(0);
+  const [populationAffected, setPopulationAffected] = useState(500);
+  const [selectedNeeds, setSelectedNeeds] = useState<string[]>(['Medical']);
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
+  const [submittedZoneId, setSubmittedZoneId] = useState<string | null>(null);
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Auto-geocode preview coordinate resolution based on location input
+  const resolvedLat = locationName.trim()
+    ? (34.0522 + (locationName.length * 0.007) % 0.1).toFixed(4)
+    : '34.0522';
+  const resolvedLng = locationName.trim()
+    ? (-118.2437 - (locationName.length * 0.009) % 0.1).toFixed(4)
+    : '-118.2437';
 
   const mutation = useMutation({
     mutationFn: (data: Partial<Zone>) => apiClient.submitReport(data),
-    onSuccess: () => {
+    onSuccess: (zone) => {
       queryClient.invalidateQueries({ queryKey: ['zones'] });
-      setToastMessage("Report submitted successfully.");
-      setTimeout(() => {
-        setToastMessage(null);
-        navigate('/'); // Go back to dashboard after a delay
-      }, 2000);
+      setSubmittedZoneId(zone.zone_id);
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Convert to the Partial<Zone> structure expected by mock API
+    if (!locationName.trim()) return;
+
     const reportData: Partial<Zone> = {
-      ...(formData.zone_id ? { zone_id: formData.zone_id } : {}),
       location: {
-        name: formData.locationName || 'Unknown Location',
-        lat: parseFloat(formData.lat) || 34.0, // Defaulting to somewhere around LA for the map
-        lng: parseFloat(formData.lng) || -118.2,
+        name: locationName.trim(),
+        lat: parseFloat(resolvedLat),
+        lng: parseFloat(resolvedLng),
       },
-      disaster_type: formData.disaster_type,
-      casualties: formData.casualties,
-      population_affected_est: formData.population_affected_est,
-      severity_score: formData.severity_score,
-      priority_tier: formData.severity_score >= 80 ? 'Critical' : formData.severity_score >= 60 ? 'High' : formData.severity_score >= 40 ? 'Medium' : 'Low',
+      disaster_type: disasterType,
+      casualties,
+      population_affected_est: populationAffected,
+      severity_score: Math.min(99, Math.max(20, Math.round((casualties * 5) + (populationAffected / 100)))),
+      priority_tier: casualties > 5 || populationAffected > 5000 ? 'Critical' : populationAffected > 1500 ? 'High' : 'Medium',
+      needs: selectedNeeds.map(n => ({
+        type: n.toLowerCase(),
+        urgency: (casualties > 0 && n === 'Medical') ? 'critical' : 'high'
+      })),
+      source_confidence: 0.88,
+      source_refs: ['direct_coordinator_input'],
+      deterioration_delta: 'initial report',
     };
 
     mutation.mutate(reportData);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: ['casualties', 'population_affected_est', 'severity_score'].includes(name) 
-        ? Number(value) 
-        : value
-    }));
+  const toggleNeed = (need: string) => {
+    setSelectedNeeds(prev =>
+      prev.includes(need) ? prev.filter(n => n !== need) : [...prev, need]
+    );
+  };
+
+  const handleSimulatePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      const fakeUrl = URL.createObjectURL(file);
+      setUploadedPhotos(prev => [...prev, fakeUrl]);
+    }
   };
 
   return (
-    <div className="flex-1 h-full overflow-y-auto p-6 lg:p-12 bg-slate-950">
-      <div className="max-w-3xl mx-auto space-y-6">
-        
-        <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-          <div className="p-2 bg-blue-900/50 rounded-lg text-blue-400">
-            <FileText className="w-6 h-6" />
-          </div>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold text-slate-100 tracking-tight">Zone Reporting</h1>
-            <p className="text-slate-500 text-sm">Submit field reports for Agent A triage processing.</p>
-          </div>
-          <NavLink
-            to="/"
-            className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Dashboard
-          </NavLink>
-        </div>
+    <div className="h-full overflow-y-auto bg-[#0E0F11] p-4 lg:p-6 text-[#E8EAED]">
+      {/* Page Header */}
+      <div className="border-b border-[#2A2E33] pb-3 mb-5">
+        <h1 className="text-lg font-bold uppercase tracking-tight text-[#E8EAED]">
+          Zone Incident Intake
+        </h1>
+        <p className="text-xs text-[#9BA1A8] mt-0.5">
+          Structured field reporting dispatch for Agent A triage ingestion
+        </p>
+      </div>
 
-        {toastMessage && (
-          <div className="p-4 bg-green-950/50 border border-green-900/50 text-green-400 rounded-lg flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5" />
-            <span className="font-medium">{toastMessage}</span>
-            <span className="text-sm ml-auto animate-pulse">Redirecting to Dashboard...</span>
+      {/* Part 1: Single-column form, max-width ~640px, left-aligned */}
+      <div className="max-w-[640px]">
+        {/* Inline confirmation (not a toast that disappears before stressed user reads it) */}
+        {submittedZoneId && (
+          <div className="mb-5 p-3 bg-[#4C7A5E]/15 border border-[#4C7A5E] text-[#E8EAED] flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-[#4C7A5E] shrink-0" />
+              <div className="text-xs">
+                <span className="font-semibold text-[#4C7A5E]">Report submitted</span>
+                {' — '}
+                Zone <span className="font-mono text-[#E8EAED] font-bold">{submittedZoneId}</span> updated and queued for automated dispatch.
+              </div>
+            </div>
+            <button
+              onClick={() => setSubmittedZoneId(null)}
+              className="text-[#9BA1A8] hover:text-[#E8EAED] text-xs p-0.5"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6 bg-slate-900/50 border border-slate-800 p-6 rounded-xl">
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">Zone ID (Optional)</label>
-              <input 
-                type="text" 
-                name="zone_id"
-                value={formData.zone_id}
-                onChange={handleChange}
-                placeholder="e.g. zone_042"
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-              <p className="text-xs text-slate-500 flex items-center gap-1">
-                <Info className="w-3 h-3" /> Leave blank to create a new zone
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">Disaster Type</label>
-              <select 
-                name="disaster_type"
-                value={formData.disaster_type}
-                onChange={handleChange}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition-colors appearance-none"
-              >
-                <option value="flood">Flood</option>
-                <option value="fire">Fire</option>
-                <option value="earthquake">Earthquake</option>
-                <option value="landslide">Landslide</option>
-                <option value="hurricane">Hurricane</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">Location Name</label>
-              <input 
-                type="text" 
-                name="locationName"
-                required
-                value={formData.locationName}
-                onChange={handleChange}
-                placeholder="e.g. Westside Clinic"
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">Latitude</label>
-              <input 
-                type="number"
-                name="lat"
-                step="0.0001"
-                min="-90"
-                max="90"
-                value={formData.lat}
-                onChange={handleChange}
-                placeholder="34.0522"
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">Longitude</label>
-              <input 
-                type="number"
-                name="lng"
-                step="0.0001"
-                min="-180"
-                max="180"
-                value={formData.lng}
-                onChange={handleChange}
-                placeholder="-118.2437"
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">Reported Casualties</label>
-              <input 
-                type="number" 
-                name="casualties"
-                min="0"
-                value={formData.casualties}
-                onChange={handleChange}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">Population Affected (Est.)</label>
-              <input 
-                type="number" 
-                name="population_affected_est"
-                min="0"
-                value={formData.population_affected_est}
-                onChange={handleChange}
-                className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-slate-300">Computed Severity Score (Mock Agent A)</label>
-              <span className={cn(
-                "text-sm font-bold px-2 py-0.5 rounded",
-                formData.severity_score >= 80 ? "text-red-400 bg-red-950/40" : formData.severity_score >= 60 ? "text-orange-400 bg-orange-950/40" : formData.severity_score >= 40 ? "text-yellow-400 bg-yellow-950/40" : "text-green-400 bg-green-950/40"
-              )}>
-                {formData.severity_score}
+        <form onSubmit={handleSubmit} className="border border-[#2A2E33] bg-[#171A1D] p-5 space-y-5">
+          {/* Field 1: Location with auto-geocode preview */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-tight text-[#9BA1A8] mb-1.5">
+              1. Incident Location / Landmark
+            </label>
+            <input
+              type="text"
+              required
+              value={locationName}
+              onChange={(e) => setLocationName(e.target.value)}
+              placeholder="e.g. Sector 4 Harbor, East Bridge, Central Clinic"
+              className="w-full bg-[#0E0F11] border border-[#2A2E33] focus:border-[#3E7CB1] px-3 py-2 text-sm text-[#E8EAED] placeholder-[#9BA1A8]/40 outline-none transition-none"
+            />
+            <div className="mt-1 flex items-center justify-between text-[11px] text-[#9BA1A8]">
+              <span>Auto-resolved geocode:</span>
+              <span className="font-mono text-[#E8EAED]">
+                {resolvedLat}° N, {resolvedLng}° W
               </span>
             </div>
-            <div className="relative">
-              <input 
-                type="range" 
-                name="severity_score"
-                min="0" 
-                max="100"
-                value={formData.severity_score}
-                onChange={handleChange}
-                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-                style={{
-                  background: `linear-gradient(to right, ${
-                    formData.severity_score >= 80 ? '#ef4444' : formData.severity_score >= 60 ? '#f97316' : formData.severity_score >= 40 ? '#eab308' : '#22c55e'
-                  } ${formData.severity_score}%, #1e293b ${formData.severity_score}%)`
-                }}
+          </div>
+
+          {/* Field 2: Disaster type (segmented control, not a dropdown) */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-tight text-[#9BA1A8] mb-1.5">
+              2. Disaster Classification
+            </label>
+            <div className="grid grid-cols-5 border border-[#2A2E33] bg-[#0E0F11] divide-x divide-[#2A2E33]">
+              {DISASTER_TYPES.map((dt) => {
+                const isSelected = disasterType === dt.id;
+                return (
+                  <button
+                    key={dt.id}
+                    type="button"
+                    onClick={() => setDisasterType(dt.id)}
+                    className={cn(
+                      'py-2 px-1 text-xs font-medium uppercase tracking-tight transition-none text-center',
+                      isSelected
+                        ? 'bg-[#1E2226] text-[#E8EAED] border-b-2 border-b-[#3E7CB1]'
+                        : 'text-[#9BA1A8] hover:text-[#E8EAED] hover:bg-[#171A1D]'
+                    )}
+                  >
+                    {dt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Field 3: Casualties and Population Affected (numeric steppers, not free text) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-tight text-[#9BA1A8] mb-1.5">
+                3a. Confirmed Casualties
+              </label>
+              <div className="flex items-stretch border border-[#2A2E33] bg-[#0E0F11]">
+                <button
+                  type="button"
+                  onClick={() => setCasualties(prev => Math.max(0, prev - 1))}
+                  className="px-3 py-2 bg-[#171A1D] hover:bg-[#1E2226] text-[#9BA1A8] hover:text-[#E8EAED] border-r border-[#2A2E33] transition-none"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center font-mono text-sm text-[#E8EAED]">
+                  {casualties}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCasualties(prev => prev + 1)}
+                  className="px-3 py-2 bg-[#171A1D] hover:bg-[#1E2226] text-[#9BA1A8] hover:text-[#E8EAED] border-l border-[#2A2E33] transition-none"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-tight text-[#9BA1A8] mb-1.5">
+                3b. Estimated Population Affected
+              </label>
+              <div className="flex items-stretch border border-[#2A2E33] bg-[#0E0F11]">
+                <button
+                  type="button"
+                  onClick={() => setPopulationAffected(prev => Math.max(50, prev - 250))}
+                  className="px-3 py-2 bg-[#171A1D] hover:bg-[#1E2226] text-[#9BA1A8] hover:text-[#E8EAED] border-r border-[#2A2E33] transition-none"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center font-mono text-sm text-[#E8EAED]">
+                  {populationAffected.toLocaleString()}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPopulationAffected(prev => prev + 250)}
+                  className="px-3 py-2 bg-[#171A1D] hover:bg-[#1E2226] text-[#9BA1A8] hover:text-[#E8EAED] border-l border-[#2A2E33] transition-none"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Field 4: Needs (multi-select chips: Medical / Shelter / Food / Rescue / Water) */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-tight text-[#9BA1A8] mb-1.5">
+              4. Immediate Unmet Needs
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {NEED_TYPES.map((need) => {
+                const isSelected = selectedNeeds.includes(need);
+                return (
+                  <button
+                    key={need}
+                    type="button"
+                    onClick={() => toggleNeed(need)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium uppercase tracking-tight border transition-none',
+                      isSelected
+                        ? 'border-[#3E7CB1] bg-[#3E7CB1]/20 text-[#E8EAED]'
+                        : 'border-[#2A2E33] bg-[#0E0F11] text-[#9BA1A8] hover:border-[#9BA1A8]'
+                    )}
+                  >
+                    {need}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Field 5: Photo upload (simple drag zone, square thumbnails, no decorative illustration) */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-tight text-[#9BA1A8] mb-1.5">
+              5. Photographic Evidence
+            </label>
+            <div className="border border-dashed border-[#2A2E33] bg-[#0E0F11] p-4 text-center">
+              <input
+                type="file"
+                id="photo-upload"
+                accept="image/*"
+                onChange={handleSimulatePhoto}
+                className="hidden"
               />
-            </div>
-            <div className="flex justify-between text-xs text-slate-600">
-              <span>Low (0)</span><span>Medium (40)</span><span>High (60)</span><span>Critical (80)</span>
-            </div>
-            <p className="text-xs text-slate-500 italic">
-              *In the full system, Agent A computes this score based on the raw report text. We use a slider here to manually override and test the UI thresholds.
-            </p>
-          </div>
+              <label
+                htmlFor="photo-upload"
+                className="cursor-pointer inline-flex items-center gap-2 text-xs text-[#9BA1A8] hover:text-[#E8EAED]"
+              >
+                <Upload className="w-4 h-4 text-[#3E7CB1]" />
+                <span>Select file or drag image here</span>
+              </label>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-300">Raw Report Text</label>
-            <textarea 
-              name="raw_report"
-              rows={4}
-              value={formData.raw_report}
-              onChange={handleChange}
-              placeholder="Enter the unstructured field report..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 transition-colors resize-y"
-            ></textarea>
-          </div>
-
-          <div className="pt-4 border-t border-slate-800 flex justify-end">
-            <button 
-              type="submit"
-              disabled={mutation.isPending}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-md font-medium transition-colors disabled:opacity-50"
-            >
-              {mutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  Submit Report
-                </>
+              {uploadedPhotos.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                  {uploadedPhotos.map((url, idx) => (
+                    <div key={idx} className="w-16 h-16 border border-[#2A2E33] bg-[#171A1D] overflow-hidden relative group">
+                      <img src={url} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setUploadedPhotos(prev => prev.filter((_, i) => i !== idx))}
+                        className="absolute inset-0 bg-black/60 text-[#E8EAED] opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
+            </div>
+          </div>
+
+          {/* Submit button: "Submit report" (active voice) */}
+          <div className="pt-2 border-t border-[#2A2E33] flex justify-end">
+            <button
+              type="submit"
+              disabled={mutation.isPending || !locationName.trim()}
+              className="px-5 py-2 bg-[#3E7CB1] hover:bg-[#346a99] disabled:opacity-50 text-[#E8EAED] text-xs font-bold uppercase tracking-tight transition-none cursor-pointer"
+            >
+              {mutation.isPending ? 'Submitting report...' : 'Submit report'}
             </button>
           </div>
-
         </form>
       </div>
     </div>

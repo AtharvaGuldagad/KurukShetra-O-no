@@ -3,180 +3,175 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { type InventoryItem } from '../api/mockData';
 import { cn } from '../lib/utils';
-import { RefreshCw, Edit, Check, X, Package, AlertCircle, TrendingDown } from 'lucide-react';
-
-function QuantityBar({ quantity, baseline }: { quantity: number; baseline: number }) {
-  const pct = Math.min(100, Math.round((quantity / baseline) * 100));
-  const color = pct < 40 ? 'bg-red-500' : pct < 70 ? 'bg-yellow-500' : 'bg-emerald-500';
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs text-slate-400 tabular-nums w-8 text-right">{pct}%</span>
-    </div>
-  );
-}
+import { RefreshCw, Check } from 'lucide-react';
 
 export default function Inventory() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editQty, setEditQty] = useState<number>(0);
+  const [editVal, setEditVal] = useState<number>(0);
   const [savedId, setSavedId] = useState<string | null>(null);
 
-  const { data: inventory, isLoading, isError, isFetching, refetch } = useQuery<InventoryItem[]>({
+  const { data: inventory = [], isLoading, error, isFetching, refetch } = useQuery<InventoryItem[]>({
     queryKey: ['inventory'],
     queryFn: apiClient.getInventory,
   });
 
-  const updateMutation = useMutation<InventoryItem, Error, { id: string; updates: Partial<InventoryItem> }>({
-    mutationFn: ({ id, updates }) => apiClient.updateInventory(id, updates),
+  const updateMutation = useMutation<InventoryItem, Error, { id: string; quantity: number }>({
+    mutationFn: ({ id, quantity }) => apiClient.updateInventory(id, { quantity }),
     onSuccess: (item) => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       setSavedId(item.id);
-      setTimeout(() => setSavedId(null), 2500);
+      setTimeout(() => setSavedId(null), 2000);
     },
   });
 
-  const startEdit = (item: InventoryItem) => {
+  const handleStartEdit = (item: InventoryItem) => {
     setEditingId(item.id);
-    setEditQty(item.quantity);
+    setEditVal(item.quantity);
   };
 
-  const cancelEdit = () => {
+  const handleCommitEdit = (id: string) => {
+    if (editVal >= 0) {
+      updateMutation.mutate({ id, quantity: editVal });
+    }
     setEditingId(null);
   };
 
-  const submitEdit = (id: string) => {
-    updateMutation.mutate({ id, updates: { quantity: editQty } });
-    setEditingId(null);
-  };
-
-  if (isLoading) {
+  if (error) {
     return (
-      <div className="p-8 space-y-4">
-        {[1, 2, 3, 4, 5].map(i => (
-          <div key={i} className="h-16 bg-slate-800/50 rounded-lg animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="p-8 text-red-400 flex items-center gap-2">
-        <AlertCircle className="w-5 h-5" />
-        Failed to load inventory. Check your connection.
+      <div className="p-8 text-xs font-mono text-[#C4432E] bg-[#0E0F11]">
+        ERROR: Failed to retrieve inventory manifest.
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex items-center gap-4 shrink-0">
-        <div className="flex items-center gap-2 mr-auto">
-          <div className="p-2 bg-slate-800 rounded-lg">
-            <Package className="w-5 h-5 text-slate-300" />
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold text-slate-100 leading-tight">Resource Inventory</h1>
-            <p className="text-xs text-slate-400">Track and update field resource quantities</p>
-          </div>
+    <div className="h-full flex flex-col bg-[#0E0F11] overflow-hidden text-[#E8EAED]">
+      {/* Header bar */}
+      <div className="h-10 px-4 border-b border-[#2A2E33] bg-[#171A1D] flex items-center justify-between shrink-0 select-none">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold uppercase tracking-tight text-[#E8EAED]">
+            Resource Depot Inventory
+          </span>
+          <span className="text-[#2A2E33]">|</span>
+          <span className="text-xs text-[#9BA1A8]">
+            {inventory.length} Stock Records Monitored
+          </span>
         </div>
 
         <button
           onClick={() => refetch()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors text-sm"
+          disabled={isFetching}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs uppercase tracking-tight bg-[#1E2226] border border-[#2A2E33] hover:border-[#3E7CB1] text-[#E8EAED] transition-none disabled:opacity-50"
         >
-          <RefreshCw className={cn("w-4 h-4", isFetching && "animate-spin")} />
-          Refresh
+          <RefreshCw className={cn("w-3 h-3", isFetching && "animate-spin")} />
+          Sync
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-5xl mx-auto">
-          {savedId && (
-            <div className="mb-4 px-4 py-3 bg-emerald-900/40 border border-emerald-700/50 rounded-lg text-emerald-300 text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-              <Check className="w-4 h-4" />
-              Inventory updated. Agent B is recalculating allocations…
-            </div>
-          )}
+      {/* Inline notification banner when updated */}
+      {savedId && (
+        <div className="px-4 py-1.5 bg-[#4C7A5E]/15 border-b border-[#4C7A5E] text-xs text-[#E8EAED] flex items-center gap-2 shrink-0">
+          <Check className="w-3.5 h-3.5 text-[#4C7A5E]" />
+          <span>Stock level updated. Agent B re-allocation recalculation triggered.</span>
+        </div>
+      )}
 
-          <div className="overflow-hidden rounded-xl border border-slate-800">
-            <table className="w-full text-sm text-left text-slate-300">
-              <thead className="bg-slate-900 text-xs uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-5 py-3">Resource</th>
-                  <th className="px-5 py-3">Depot</th>
-                  <th className="px-5 py-3">Agency</th>
-                  <th className="px-5 py-3">Quantity / Stock Level</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
+      {/* Main Table View */}
+      <div className="flex-1 overflow-auto p-4">
+        {isLoading ? (
+          <div className="text-xs font-mono text-[#9BA1A8]">READING INVENTORY BUFFER...</div>
+        ) : (
+          <div className="border border-[#2A2E33] bg-[#171A1D]">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-[#2A2E33] bg-[#1E2226] text-[#9BA1A8]">
+                  <th className="w-1 p-0"></th>
+                  <th className="p-2.5 font-semibold uppercase tracking-tight">Resource Type</th>
+                  <th className="p-2.5 font-semibold uppercase tracking-tight">Depot Location</th>
+                  <th className="p-2.5 font-semibold uppercase tracking-tight">Owning Agency</th>
+                  <th className="p-2.5 font-semibold uppercase tracking-tight text-right">Quantity Available</th>
+                  <th className="p-2.5 font-semibold uppercase tracking-tight text-right">Baseline Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {inventory?.map((item) => {
-                  const isLow = item.quantity < item.baseline_quantity * 0.4;
+              <tbody className="divide-y divide-[#2A2E33]">
+                {inventory.map((item) => {
+                  const pct = item.baseline_quantity > 0 ? (item.quantity / item.baseline_quantity) : 1;
+                  const isCritical = pct < 0.25;
+                  const isHigh = pct >= 0.25 && pct < 0.50;
+                  const isEditing = editingId === item.id;
+
+                  // Left-edge bar color per Part 3
+                  const barColor = isCritical ? '#C4432E' : isHigh ? '#C97A2E' : 'transparent';
+
                   return (
-                    <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          {isLow && <TrendingDown className="w-4 h-4 text-red-400 shrink-0" />}
-                          <span className={cn("font-medium", isLow ? "text-red-300" : "text-slate-200")}>
-                            {item.resource_type.replace(/_/g, ' ')}
-                          </span>
-                        </div>
+                    <tr
+                      key={item.id}
+                      className={cn(
+                        'hover:bg-[#1E2226]/60 transition-none',
+                        isEditing && 'bg-[#1E2226]'
+                      )}
+                    >
+                      {/* Left-edge low-stock bar (3px) */}
+                      <td className="w-[3px] p-0" style={{ backgroundColor: barColor }} />
+
+                      <td className="p-2.5 font-semibold text-[#E8EAED]">
+                        {item.resource_type}
                       </td>
-                      <td className="px-5 py-4 text-slate-400 font-mono text-xs">{item.depot}</td>
-                      <td className="px-5 py-4 text-slate-400">{item.agency}</td>
-                      <td className="px-5 py-4 min-w-48">
-                        {editingId === item.id ? (
-                          <input
-                            type="number"
-                            min="0"
-                            value={editQty}
-                            onChange={(e) => setEditQty(Number(e.target.value))}
-                            className="w-24 px-2 py-1 rounded-lg bg-slate-900 text-slate-200 border border-blue-500 focus:outline-none"
-                            autoFocus
-                          />
-                        ) : (
-                          <div className="space-y-1.5">
-                            <span className={cn("font-semibold tabular-nums", isLow ? "text-red-400" : "text-slate-200")}>
-                              {item.quantity.toLocaleString()}
-                              <span className="text-slate-600 font-normal text-xs ml-1">/ {item.baseline_quantity.toLocaleString()}</span>
-                            </span>
-                            <QuantityBar quantity={item.quantity} baseline={item.baseline_quantity} />
+
+                      <td className="p-2.5 text-[#9BA1A8]">
+                        {item.depot}
+                      </td>
+
+                      <td className="p-2.5 text-[#E8EAED]">
+                        {item.agency}
+                      </td>
+
+                      {/* Right-aligned quantity column with IBM Plex Mono and inline click-to-edit */}
+                      <td className="p-2.5 text-right font-mono">
+                        {isEditing ? (
+                          <div className="inline-flex items-center gap-1 justify-end">
+                            <input
+                              type="number"
+                              autoFocus
+                              value={editVal}
+                              onChange={(e) => setEditVal(Number(e.target.value))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleCommitEdit(item.id);
+                                if (e.key === 'Escape') setEditingId(null);
+                              }}
+                              className="w-20 bg-[#0E0F11] border border-[#3E7CB1] text-right font-mono text-xs px-1.5 py-0.5 text-[#E8EAED] outline-none"
+                            />
+                            <button
+                              onClick={() => handleCommitEdit(item.id)}
+                              className="px-1.5 py-0.5 bg-[#3E7CB1] text-[#E8EAED] text-[11px] font-sans uppercase font-bold"
+                            >
+                              Save
+                            </button>
                           </div>
+                        ) : (
+                          <button
+                            onClick={() => handleStartEdit(item)}
+                            title="Click to update quantity"
+                            className="hover:underline font-mono text-xs text-[#E8EAED] cursor-pointer"
+                          >
+                            {item.quantity.toLocaleString()}
+                          </button>
                         )}
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex gap-2 items-center justify-end">
-                          {editingId === item.id ? (
-                            <>
-                              <button
-                                onClick={() => submitEdit(item.id)}
-                                className="p-1.5 text-green-400 rounded-lg hover:bg-slate-700 transition-colors"
-                                title="Save"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={cancelEdit}
-                                className="p-1.5 text-red-400 rounded-lg hover:bg-slate-700 transition-colors"
-                                title="Cancel"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => startEdit(item)}
-                              className="p-1.5 text-slate-400 rounded-lg hover:bg-slate-700 hover:text-slate-200 transition-colors"
-                              title="Edit quantity"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
+
+                      <td className="p-2.5 text-right font-mono text-[#9BA1A8] text-[11px]">
+                        {Math.round(pct * 100)}% of baseline ({item.baseline_quantity})
+                        {isCritical && (
+                          <span className="ml-2 font-bold text-[#C4432E] uppercase font-sans text-[10px]">
+                            CRITICAL
+                          </span>
+                        )}
+                        {isHigh && (
+                          <span className="ml-2 font-bold text-[#C97A2E] uppercase font-sans text-[10px]">
+                            LOW
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -184,7 +179,7 @@ export default function Inventory() {
               </tbody>
             </table>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

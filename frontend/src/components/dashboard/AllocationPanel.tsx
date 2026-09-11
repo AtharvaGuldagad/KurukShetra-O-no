@@ -1,95 +1,77 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
-import { CheckCircle, Package, Clock, ShieldAlert } from 'lucide-react';
-import { cn } from '../../lib/utils';
-import { type Allocation } from '../../api/mockData';
+import { type Allocation, type InventoryItem } from '../../api/mockData';
 
 export function AllocationPanel() {
-  const { data: allocations = [], isLoading, error } = useQuery<Allocation[]>({
+  const { data: allocations = [] } = useQuery<Allocation[]>({
     queryKey: ['allocations'],
     queryFn: apiClient.getAllocations,
-    staleTime: 1000 * 60 * 5,
   });
 
-  if (isLoading) {
-    return <div className="p-4 text-slate-500 text-sm">Loading allocations...</div>;
-  }
+  const { data: inventory = [] } = useQuery<InventoryItem[]>({
+    queryKey: ['inventory'],
+    queryFn: apiClient.getInventory,
+  });
 
-  if (error) {
-    return <div className="p-4 text-red-400 text-sm">Failed to load allocations.</div>;
-  }
+  // Calculate allocated vs remaining per resource type
+  const resourceSummary = inventory.map(item => {
+    const itemAllocated = allocations
+      .filter(a => a.resource_type.toLowerCase() === item.resource_type.toLowerCase())
+      .reduce((sum, a) => sum + a.quantity, 0);
+    const total = item.baseline_quantity || (item.quantity + itemAllocated);
+    const remaining = Math.max(0, total - itemAllocated);
+    const allocPct = total > 0 ? Math.min(100, Math.round((itemAllocated / total) * 100)) : 0;
 
-  if (allocations.length === 0) {
-    return <div className="p-4 text-slate-500 text-sm">No active allocations.</div>;
-  }
+    return {
+      name: item.resource_type,
+      allocated: itemAllocated,
+      remaining,
+      total,
+      pct: allocPct,
+    };
+  });
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-900/50">
-      {allocations.map(alloc => (
-        <div
-          key={alloc.allocation_id}
-          className={cn(
-            "p-3 rounded-lg border bg-slate-800/80 transition-colors flex flex-col gap-2",
-            alloc.requires_human_approval 
-              ? "border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.1)]" 
-              : "border-slate-700"
-          )}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-slate-400" />
-              <span className="font-semibold text-slate-200">
-                {alloc.quantity}x {alloc.resource_type.replace('_', ' ')}
+    <div className="flex-1 overflow-y-auto p-3 bg-[#171A1D]">
+      <div className="text-xs font-semibold uppercase tracking-tight text-[#9BA1A8] mb-2">
+        Resource Allocation Summary (Allocated vs. Remaining)
+      </div>
+
+      <div className="space-y-2.5">
+        {resourceSummary.map((res) => (
+          <div key={res.name} className="border border-[#2A2E33] bg-[#0E0F11] p-2.5">
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <span className="font-semibold text-[#E8EAED] uppercase tracking-tight">
+                {res.name}
               </span>
-            </div>
-            {alloc.requires_human_approval ? (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-950/50 text-red-400 border border-red-900/50">
-                <ShieldAlert className="w-3 h-3" />
-                Needs Approval
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-950/50 text-green-400 border border-green-900/50">
-                <CheckCircle className="w-3 h-3" />
-                Auto-Approved
-              </span>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4 text-sm mt-1">
-            <div>
-              <span className="text-slate-500 text-xs block mb-0.5">Destination</span>
-              <span className="text-slate-300 font-mono text-xs">{alloc.zone_id}</span>
-            </div>
-            <div>
-              <span className="text-slate-500 text-xs block mb-0.5">Assigned Agency</span>
-              <span className="text-blue-300">{alloc.assigned_agency}</span>
-            </div>
-            <div className="col-span-2">
-              <span className="text-slate-500 text-xs block mb-0.5">Reasoning (Agent B)</span>
-              <p className="text-slate-400 text-xs leading-relaxed italic border-l-2 border-slate-700 pl-2">
-                "{alloc.reasoning}"
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Clock className="w-3 h-3" />
-              <span>{new Date(alloc.timestamp).toLocaleTimeString()}</span>
-            </div>
-            {alloc.requires_human_approval && (
-              <div className="flex gap-2">
-                <button className="px-3 py-1 text-xs font-medium rounded bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">
-                  Reject
-                </button>
-                <button className="px-3 py-1 text-xs font-medium rounded bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/30 transition-colors">
-                  Approve
-                </button>
+              <div className="font-mono text-xs text-[#9BA1A8] flex items-center gap-2">
+                <span>
+                  Allocated: <strong className="text-[#3E7CB1]">{res.allocated}</strong>
+                </span>
+                <span>/</span>
+                <span>
+                  Remaining: <strong className="text-[#E8EAED]">{res.remaining}</strong>
+                </span>
+                <span className="text-[#9BA1A8]">({res.pct}%)</span>
               </div>
-            )}
+            </div>
+
+            {/* Simple horizontal bar: allocated (#3E7CB1) vs remaining (#2A2E33) */}
+            <div className="w-full h-2 bg-[#2A2E33] overflow-hidden flex">
+              <div
+                className="h-full bg-[#3E7CB1] transition-none"
+                style={{ width: `${res.pct}%` }}
+                title={`Allocated: ${res.pct}%`}
+              />
+              <div
+                className="h-full bg-[#4C7A5E] opacity-70 transition-none"
+                style={{ width: `${100 - res.pct}%` }}
+                title={`Remaining: ${100 - res.pct}%`}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

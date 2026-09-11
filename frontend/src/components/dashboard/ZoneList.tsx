@@ -1,88 +1,79 @@
 import { cn } from '../../lib/utils';
 import { type Zone } from '../../api/mockData';
-import { SeverityBadge, NeedTag, ConfidenceBar, DisasterTypeIcon } from '../ui/ZoneUI';
-import { Users, AlertTriangle, TrendingUp, ChevronRight } from 'lucide-react';
+import { SeverityEdgeBar } from '../ui/ZoneUI';
 
-interface ZoneCardProps {
+interface ZoneRowProps {
   zone: Zone;
-  rank: number;
   isSelected: boolean;
   isRecentlyUpdated: boolean;
   onClick: () => void;
 }
 
-export function ZoneCard({ zone, rank, isSelected, isRecentlyUpdated, onClick }: ZoneCardProps) {
+export function ZoneRow({ zone, isSelected, isRecentlyUpdated, onClick }: ZoneRowProps) {
   const topNeed = zone.needs[0];
+  // Stable mockup or derived timestamp from zone
+  const timestamp = "18:42:15Z";
 
   return (
-    <button
+    <div
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
       className={cn(
-        'w-full text-left p-3 rounded-lg border transition-all duration-300 group relative overflow-hidden',
-        'hover:bg-slate-700/50',
-        isSelected
-          ? 'bg-slate-700/70 border-slate-500 ring-1 ring-slate-400'
-          : 'bg-slate-800/60 border-slate-700/60',
-        isRecentlyUpdated && 'ring-2 ring-blue-400 border-blue-500/60'
+        'w-full text-left flex items-stretch border-b border-[#2A2E33] cursor-pointer select-none transition-none',
+        isSelected ? 'bg-[#1E2226]' : 'bg-[#171A1D] hover:bg-[#1E2226]/50',
+        isRecentlyUpdated && 'pulse-highlight'
       )}
     >
-      {/* Update flash */}
-      {isRecentlyUpdated && (
-        <div className="absolute inset-0 bg-blue-400/10 animate-pulse pointer-events-none rounded-lg" />
-      )}
+      {/* 3px left-edge bar carrying severity tier */}
+      <SeverityEdgeBar tier={zone.priority_tier} />
 
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-slate-500 text-xs font-mono w-5 shrink-0">#{rank}</span>
-          <DisasterTypeIcon type={zone.disaster_type} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-100 truncate">{zone.location.name}</p>
-            <p className="text-xs text-slate-400 capitalize">{zone.disaster_type}</p>
+      {/* Row content */}
+      <div className="flex-1 px-3 py-2.5 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-sm text-[#E8EAED] truncate">
+              {zone.location.name}
+            </span>
+            <span className="font-mono text-xs text-[#9BA1A8] shrink-0">
+              [{zone.zone_id}]
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="font-mono text-xs text-[#E8EAED]">
+              SCORE {zone.severity_score}
+            </span>
+            <span className="font-mono text-[11px] text-[#9BA1A8]">
+              {timestamp}
+            </span>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <SeverityBadge tier={zone.priority_tier} score={zone.severity_score} size="sm" />
-          <ChevronRight className={cn(
-            'w-3 h-3 text-slate-500 transition-transform group-hover:translate-x-0.5',
-            isSelected && 'text-slate-300'
-          )} />
+
+        <div className="mt-1.5 flex items-center justify-between text-xs text-[#9BA1A8]">
+          <div className="flex items-center gap-3">
+            <span>
+              Pop: <strong className="font-mono text-[#E8EAED]">{zone.population_affected_est.toLocaleString()}</strong>
+            </span>
+            {zone.casualties > 0 && (
+              <span className="text-[#C4432E]">
+                Casualties: <strong className="font-mono text-[#C4432E]">{zone.casualties}</strong>
+              </span>
+            )}
+            {topNeed && (
+              <span className="truncate">
+                Top need: <span className="text-[#E8EAED]">{topNeed.type} ({topNeed.urgency})</span>
+              </span>
+            )}
+          </div>
+
+          <span className="text-xs uppercase text-[#9BA1A8]">
+            {zone.disaster_type}
+          </span>
         </div>
       </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-        <span className="flex items-center gap-1">
-          <Users className="w-3 h-3" />
-          {zone.population_affected_est.toLocaleString()}
-        </span>
-        {zone.casualties > 0 && (
-          <span className="flex items-center gap-1 text-red-400 font-medium">
-            <AlertTriangle className="w-3 h-3" />
-            {zone.casualties} casualt{zone.casualties !== 1 ? 'ies' : 'y'}
-          </span>
-        )}
-        {zone.deterioration_delta && zone.deterioration_delta !== 'stable' && (
-          <span className="flex items-center gap-1 text-orange-400">
-            <TrendingUp className="w-3 h-3" />
-            {zone.deterioration_delta}
-          </span>
-        )}
-      </div>
-
-      {topNeed && (
-        <div className="mt-2">
-          <NeedTag type={topNeed.type} urgency={topNeed.urgency} />
-        </div>
-      )}
-
-      <div className="mt-2 flex items-center gap-1.5">
-        <span className="text-xs text-slate-500">Confidence:</span>
-        <ConfidenceBar value={zone.source_confidence} refs={zone.source_refs} />
-      </div>
-
-      {isRecentlyUpdated && (
-        <div className="mt-1.5 text-xs text-blue-400 font-medium">⚡ Just updated</div>
-      )}
-    </button>
+    </div>
   );
 }
 
@@ -97,22 +88,22 @@ export function ZoneList({ zones, selectedZoneId, recentlyUpdated, onSelectZone 
   const sorted = [...zones].sort((a, b) => b.severity_score - a.severity_score);
 
   return (
-    <div className="flex flex-col gap-2 overflow-y-auto h-full pr-1">
-      {sorted.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-40 text-slate-500">
-          <p className="text-sm">No active zones</p>
+    <div className="flex flex-col h-full overflow-y-auto bg-[#171A1D]">
+      {sorted.length === 0 ? (
+        <div className="p-6 text-center text-[#9BA1A8] text-xs">
+          No active zones reporting
         </div>
+      ) : (
+        sorted.map((zone) => (
+          <ZoneRow
+            key={zone.zone_id}
+            zone={zone}
+            isSelected={zone.zone_id === selectedZoneId}
+            isRecentlyUpdated={recentlyUpdated.has(zone.zone_id)}
+            onClick={() => onSelectZone(zone.zone_id)}
+          />
+        ))
       )}
-      {sorted.map((zone, i) => (
-        <ZoneCard
-          key={zone.zone_id}
-          zone={zone}
-          rank={i + 1}
-          isSelected={zone.zone_id === selectedZoneId}
-          isRecentlyUpdated={recentlyUpdated.has(zone.zone_id)}
-          onClick={() => onSelectZone(zone.zone_id)}
-        />
-      ))}
     </div>
   );
 }
