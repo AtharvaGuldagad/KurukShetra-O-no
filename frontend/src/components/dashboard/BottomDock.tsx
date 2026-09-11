@@ -9,10 +9,13 @@ export function BottomDock() {
   const [activeTab, setActiveTab] = useState<'allocations' | 'tasks'>('allocations');
 
   return (
-    <div className={cn(
-      "absolute bottom-0 left-0 right-0 z-[1000] bg-slate-900 border-t border-slate-700 flex flex-col transition-all duration-300 ease-in-out shadow-2xl",
-      isOpen ? "h-72" : "h-10"
-    )}>
+    <div 
+      className={cn(
+        "absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700 flex flex-col transition-all duration-300 ease-in-out shadow-2xl",
+        isOpen ? "h-72" : "h-10"
+      )}
+      style={{ zIndex: 9999 }}
+    >
       {/* Dock Header / Handle */}
       <div 
         className="h-10 flex items-center justify-between px-4 bg-slate-800/80 cursor-pointer shrink-0 hover:bg-slate-700/80 transition-colors"

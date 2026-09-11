@@ -4,6 +4,7 @@ import { socket } from './api/socket';
 import { seedZones } from './api/mockData';
 import { db } from './api/client';
 import Dashboard from './pages/Dashboard';
+import ZoneReporting from './pages/ZoneReporting';
 import { cn } from './lib/utils';
 import {
   Map, FileText, Package, Radio, ScrollText,
@@ -16,13 +17,7 @@ const queryClient = new QueryClient({
   }
 });
 
-// Stub pages for phases 2–8
-const ZoneReporting = () => (
-  <div className="p-8 text-slate-400">
-    <h2 className="text-xl font-semibold text-slate-200 mb-2">Zone Reporting</h2>
-    <p>Field report submission form — Phase 3.</p>
-  </div>
-);
+// Stub pages for phases 4–8
 const Inventory = () => (
   <div className="p-8 text-slate-400">
     <h2 className="text-xl font-semibold text-slate-200 mb-2">Resource Inventory</h2>
