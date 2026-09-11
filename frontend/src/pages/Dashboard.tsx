@@ -6,14 +6,22 @@ import { type Zone } from '../api/mockData';
 import { ZoneList } from '../components/dashboard/ZoneList';
 import { ZoneDetailPanel } from '../components/dashboard/ZoneDetailPanel';
 
-import { Activity, Map as MapIcon, List, RefreshCw, AlertCircle } from 'lucide-react';
+import { Activity, Map as MapIcon, List, RefreshCw, AlertCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 // Lazy import the map to avoid SSR/leaflet issues
 import ZoneMap from '../components/map/ZoneMap';
 import { BottomDock } from '../components/dashboard/BottomDock';
+import { ReallocationModal, type ReallocationPlan } from '../components/dashboard/ReallocationModal';
 
 const UPDATE_FLASH_DURATION = 4000; // ms to show "just updated" indicator
+
+interface DuplicateFlag {
+  id: string;
+  zone_id: string;
+  conflict: string[];
+  need_type: string;
+}
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -21,6 +29,8 @@ export default function Dashboard() {
   const [recentlyUpdated, setRecentlyUpdated] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'split' | 'map' | 'list'>('split');
   const [wsEvents, setWsEvents] = useState<string[]>([]);
+  const [duplicateFlags, setDuplicateFlags] = useState<DuplicateFlag[]>([]);
+  const [reallocationPlan, setReallocationPlan] = useState<ReallocationPlan | null>(null);
 
   const { data: zones = [], isLoading, error, isFetching } = useQuery<Zone[]>({
     queryKey: ['zones'],
@@ -59,7 +69,11 @@ export default function Dashboard() {
     };
 
     const onAllocationRecalculated = (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      if (data.diffs && data.diffs.length > 0) {
+        setReallocationPlan(data);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      }
       setWsEvents(prev => [`AllocationRecalculated: ${data.reason ?? 'triggered'}`, ...prev.slice(0, 4)]);
     };
 
@@ -68,14 +82,24 @@ export default function Dashboard() {
       setWsEvents(prev => [`AgencyStatusChanged: ${data.agency_name ?? data.agency_id}`, ...prev.slice(0, 4)]);
     };
 
+    const onDuplicateFlagged = (data: { zone_id: string; conflict: string[]; need_type: string }) => {
+      setDuplicateFlags(prev => [
+        { id: Math.random().toString(36).substring(2, 11), ...data },
+        ...prev
+      ]);
+      setWsEvents(prev => [`DuplicateFlagged: ${data.zone_id}`, ...prev.slice(0, 4)]);
+    };
+
     socket.on('ZoneUpdated', onZoneUpdated);
     socket.on('AllocationRecalculated', onAllocationRecalculated);
     socket.on('AgencyStatusChanged', onAgencyStatusChanged);
+    socket.on('DuplicateFlagged', onDuplicateFlagged);
 
     return () => {
       socket.off('ZoneUpdated', onZoneUpdated);
       socket.off('AllocationRecalculated', onAllocationRecalculated);
       socket.off('AgencyStatusChanged', onAgencyStatusChanged);
+      socket.off('DuplicateFlagged', onDuplicateFlagged);
     };
   }, [queryClient, flashZone]);
 
@@ -96,6 +120,18 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+      {reallocationPlan && (
+        <ReallocationModal
+          plan={reallocationPlan}
+          onClose={(accepted) => {
+            setReallocationPlan(null);
+            if (accepted) {
+              queryClient.invalidateQueries({ queryKey: ['allocations'] });
+            }
+          }}
+        />
+      )}
+
       {/* Status bar */}
       <div className="flex items-center justify-between px-4 py-2 bg-slate-800/80 border-b border-slate-700 shrink-0">
         <div className="flex items-center gap-4">
@@ -146,6 +182,38 @@ export default function Dashboard() {
 
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden relative">
+        {/* DUPLICATE FLAGS PANEL */}
+        {duplicateFlags.length > 0 && (
+          <div className="absolute top-4 right-4 z-[2000] flex flex-col gap-2 w-80 pointer-events-none">
+            {duplicateFlags.map(flag => (
+              <div key={flag.id} className="bg-slate-800 border border-yellow-500/50 rounded-lg p-3 shadow-lg pointer-events-auto flex flex-col gap-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-1.5 text-yellow-500">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="font-semibold text-sm">Duplicate Effort</span>
+                  </div>
+                  <button 
+                    onClick={() => setDuplicateFlags(prev => prev.filter(f => f.id !== flag.id))}
+                    className="text-xs text-slate-400 hover:text-white bg-slate-700 hover:bg-slate-600 px-2 py-0.5 rounded transition-colors"
+                  >
+                    Resolve
+                  </button>
+                </div>
+                <div className="text-xs text-slate-300 mt-1">
+                  <span className="text-slate-400 font-medium">Zone:</span> {flag.zone_id} <br/>
+                  <span className="text-slate-400 font-medium">Need:</span> {flag.need_type}
+                </div>
+                <div className="text-xs font-medium text-slate-200 bg-slate-900/50 p-1.5 rounded mt-1">
+                  Conflicting Agencies:
+                  <ul className="list-disc pl-4 mt-1 text-red-300">
+                    {flag.conflict.map((c, i) => <li key={i}>{c}</li>)}
+                  </ul>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Zone list sidebar */}
         {(viewMode === 'split' || viewMode === 'list') && (
           <div className="w-72 xl:w-80 shrink-0 flex flex-col border-r border-slate-700 bg-slate-900/50 overflow-hidden">

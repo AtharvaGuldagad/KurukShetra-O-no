@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, NavLink } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
-import { FileText, Send, AlertCircle, Info, Loader2 } from 'lucide-react';
+import { FileText, Send, CheckCircle2, Info, Loader2, ArrowLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { type Zone } from '../api/mockData';
 
@@ -75,15 +75,22 @@ export default function ZoneReporting() {
           <div className="p-2 bg-blue-900/50 rounded-lg text-blue-400">
             <FileText className="w-6 h-6" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold text-slate-100 tracking-tight">Zone Reporting</h1>
             <p className="text-slate-500 text-sm">Submit field reports for Agent A triage processing.</p>
           </div>
+          <NavLink
+            to="/"
+            className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Dashboard
+          </NavLink>
         </div>
 
         {toastMessage && (
           <div className="p-4 bg-green-950/50 border border-green-900/50 text-green-400 rounded-lg flex items-center gap-3">
-            <AlertCircle className="w-5 h-5" />
+            <CheckCircle2 className="w-5 h-5" />
             <span className="font-medium">{toastMessage}</span>
             <span className="text-sm ml-auto animate-pulse">Redirecting to Dashboard...</span>
           </div>
@@ -140,8 +147,11 @@ export default function ZoneReporting() {
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300">Latitude</label>
               <input 
-                type="text" 
+                type="number"
                 name="lat"
+                step="0.0001"
+                min="-90"
+                max="90"
                 value={formData.lat}
                 onChange={handleChange}
                 placeholder="34.0522"
@@ -151,8 +161,11 @@ export default function ZoneReporting() {
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300">Longitude</label>
               <input 
-                type="text" 
+                type="number"
                 name="lng"
+                step="0.0001"
+                min="-180"
+                max="180"
                 value={formData.lng}
                 onChange={handleChange}
                 placeholder="-118.2437"
@@ -190,21 +203,31 @@ export default function ZoneReporting() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-slate-300">Computed Severity Score (Mock Agent A)</label>
               <span className={cn(
-                "text-sm font-bold",
-                formData.severity_score >= 80 ? "text-red-400" : formData.severity_score >= 60 ? "text-orange-400" : formData.severity_score >= 40 ? "text-yellow-400" : "text-green-400"
+                "text-sm font-bold px-2 py-0.5 rounded",
+                formData.severity_score >= 80 ? "text-red-400 bg-red-950/40" : formData.severity_score >= 60 ? "text-orange-400 bg-orange-950/40" : formData.severity_score >= 40 ? "text-yellow-400 bg-yellow-950/40" : "text-green-400 bg-green-950/40"
               )}>
                 {formData.severity_score}
               </span>
             </div>
-            <input 
-              type="range" 
-              name="severity_score"
-              min="0" 
-              max="100"
-              value={formData.severity_score}
-              onChange={handleChange}
-              className="w-full accent-blue-500 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"
-            />
+            <div className="relative">
+              <input 
+                type="range" 
+                name="severity_score"
+                min="0" 
+                max="100"
+                value={formData.severity_score}
+                onChange={handleChange}
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, ${
+                    formData.severity_score >= 80 ? '#ef4444' : formData.severity_score >= 60 ? '#f97316' : formData.severity_score >= 40 ? '#eab308' : '#22c55e'
+                  } ${formData.severity_score}%, #1e293b ${formData.severity_score}%)`
+                }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-slate-600">
+              <span>Low (0)</span><span>Medium (40)</span><span>High (60)</span><span>Critical (80)</span>
+            </div>
             <p className="text-xs text-slate-500 italic">
               *In the full system, Agent A computes this score based on the raw report text. We use a slider here to manually override and test the UI thresholds.
             </p>

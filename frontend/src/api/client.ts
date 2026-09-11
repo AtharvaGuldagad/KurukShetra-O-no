@@ -1,9 +1,26 @@
 import { seedZones, seedInventory, seedAllocations, seedAgencyTasks, seedAuditLog, type Zone, type InventoryItem, type Allocation, type AgencyTask, type AuditEntry } from './mockData';
 import { socket } from './socket';
 
+// ─── Feature Flag ────────────────────────────────────────────────────────────
+// Toggle this to false to swap to the real REST/WS backend.
+// The base URL can also be set via VITE_API_BASE_URL env var.
 const USE_MOCK = true;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
-// In-memory data store for the mock
+// ─── Real-backend helper ──────────────────────────────────────────────────────
+async function fetchApi<T>(endpoint: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE_URL}${endpoint}`, {
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    ...init,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+// ─── Mock in-memory DB ────────────────────────────────────────────────────────
 export const db = {
   zones: [...seedZones],
   inventory: [...seedInventory],
@@ -15,23 +32,32 @@ export const db = {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 let auditIdCounter = 100;
-function addAuditEntry(entry: Omit<AuditEntry, 'id'>) {
+export function addAuditEntry(entry: Omit<AuditEntry, 'id'>) {
   const full: AuditEntry = { id: `audit_${auditIdCounter++}`, ...entry };
   db.auditLog.unshift(full);
   return full;
 }
 
+export interface AuditFilter {
+  event_type?: string;
+  actor?: string;
+  search?: string;
+}
+
+// ─── API Client ───────────────────────────────────────────────────────────────
 export const apiClient = {
+  // GET /api/zones
   getZones: async (): Promise<Zone[]> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+    if (!USE_MOCK) return fetchApi<Zone[]>('/api/zones');
     await delay(300);
     return [...db.zones].sort((a, b) => b.severity_score - a.severity_score);
   },
 
-  getZoneHistory: async (_id: string): Promise<any[]> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+  // GET /api/zones/:id/history
+  getZoneHistory: async (id: string): Promise<any[]> => {
+    if (!USE_MOCK) return fetchApi<any[]>(`/api/zones/${id}/history`);
     await delay(300);
-    const zone = db.zones.find(z => z.zone_id === _id);
+    const zone = db.zones.find(z => z.zone_id === id);
     return [
       { timestamp: new Date(Date.now() - 7200000).toISOString(), severity_score: (zone?.severity_score || 50) - 10, priority_tier: zone?.priority_tier, note: 'Initial report' },
       { timestamp: new Date(Date.now() - 3600000).toISOString(), severity_score: (zone?.severity_score || 50) - 5, priority_tier: zone?.priority_tier, note: 'Updated from field team' },
@@ -39,11 +65,11 @@ export const apiClient = {
     ];
   },
 
+  // POST /api/zones/report
   submitReport: async (report: Partial<Zone>): Promise<Zone> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+    if (!USE_MOCK) return fetchApi<Zone>('/api/zones/report', { method: 'POST', body: JSON.stringify(report) });
     await delay(600);
 
-    // Check if zone exists to update
     const existingIdx = db.zones.findIndex(z => z.zone_id === report.zone_id);
     let zone: Zone;
 
@@ -76,17 +102,19 @@ export const apiClient = {
     return zone;
   },
 
+  // GET /api/inventory
   getInventory: async (): Promise<InventoryItem[]> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+    if (!USE_MOCK) return fetchApi<InventoryItem[]>('/api/inventory');
     await delay(300);
     return [...db.inventory];
   },
 
+  // PATCH /api/inventory/:id
   updateInventory: async (id: string, updates: Partial<InventoryItem>): Promise<InventoryItem> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+    if (!USE_MOCK) return fetchApi<InventoryItem>(`/api/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(updates) });
     await delay(300);
     const idx = db.inventory.findIndex(i => i.id === id);
-    if (idx === -1) throw new Error("Inventory item not found");
+    if (idx === -1) throw new Error('Inventory item not found');
 
     db.inventory[idx] = { ...db.inventory[idx], ...updates };
 
@@ -113,14 +141,16 @@ export const apiClient = {
     return db.inventory[idx];
   },
 
+  // GET /api/allocations
   getAllocations: async (): Promise<Allocation[]> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+    if (!USE_MOCK) return fetchApi<Allocation[]>('/api/allocations');
     await delay(300);
     return [...db.allocations];
   },
 
+  // POST /api/allocations/recalculate
   recalculateAllocations: async (): Promise<void> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+    if (!USE_MOCK) { await fetchApi<void>('/api/allocations/recalculate', { method: 'POST' }); return; }
     await delay(1000);
 
     addAuditEntry({
@@ -134,11 +164,12 @@ export const apiClient = {
     socket.emitFromServer('AllocationRecalculated', { reason: 'manual_trigger' });
   },
 
+  // POST /api/agency-tasks/:id/status
   updateAgencyTaskStatus: async (id: string, status: string): Promise<AgencyTask> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+    if (!USE_MOCK) return fetchApi<AgencyTask>(`/api/agency-tasks/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
     await delay(300);
     const idx = db.agencyTasks.findIndex(t => t.id === id);
-    if (idx === -1) throw new Error("Task not found");
+    if (idx === -1) throw new Error('Task not found');
 
     const prev = db.agencyTasks[idx].status;
     db.agencyTasks[idx].status = status as AgencyTask['status'];
@@ -156,14 +187,39 @@ export const apiClient = {
     return db.agencyTasks[idx];
   },
 
-  getAuditLog: async (_filter?: string): Promise<AuditEntry[]> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+  // GET /api/audit-log?event_type=...&actor=...&search=...
+  getAuditLog: async (filter?: AuditFilter): Promise<AuditEntry[]> => {
+    if (!USE_MOCK) {
+      const params = new URLSearchParams();
+      if (filter?.event_type && filter.event_type !== 'all') params.set('event_type', filter.event_type);
+      if (filter?.actor && filter.actor !== 'all') params.set('actor', filter.actor);
+      if (filter?.search) params.set('search', filter.search);
+      const qs = params.toString();
+      return fetchApi<AuditEntry[]>(`/api/audit-log${qs ? `?${qs}` : ''}`);
+    }
     await delay(300);
-    return [...db.auditLog];
+    let results = [...db.auditLog];
+    if (filter) {
+      if (filter.event_type && filter.event_type !== 'all') {
+        results = results.filter(r => r.event_type === filter.event_type);
+      }
+      if (filter.actor && filter.actor !== 'all') {
+        results = results.filter(r => r.actor === filter.actor);
+      }
+      if (filter.search) {
+        const query = filter.search.toLowerCase();
+        results = results.filter(r =>
+          r.summary.toLowerCase().includes(query) ||
+          r.zone_id?.toLowerCase().includes(query)
+        );
+      }
+    }
+    return results;
   },
 
+  // GET /api/agency-tasks
   getAgencyTasks: async (): Promise<AgencyTask[]> => {
-    if (!USE_MOCK) throw new Error("Real API not implemented");
+    if (!USE_MOCK) return fetchApi<AgencyTask[]>('/api/agency-tasks');
     await delay(300);
     return [...db.agencyTasks];
   }
