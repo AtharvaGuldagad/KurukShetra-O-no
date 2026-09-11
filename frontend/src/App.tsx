@@ -1,122 +1,65 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { socket } from './api/socket';
 
-function App() {
-  const [count, setCount] = useState(0)
+const queryClient = new QueryClient();
+
+// Placeholder components for Phase 0
+const Dashboard = () => <div><h2>Dashboard</h2><p>Coordination map and ranked list will go here.</p></div>;
+const ZoneReporting = () => <div><h2>Zone Reporting</h2><p>Field report form will go here.</p></div>;
+const Inventory = () => <div><h2>Inventory</h2><p>Stock management will go here.</p></div>;
+const AgencyConsole = () => <div><h2>Agency Console</h2><p>Agency tasks will go here.</p></div>;
+const AuditLog = () => <div><h2>Audit Log</h2><p>Event history will go here.</p></div>;
+
+const Shell = ({ children }: { children: React.ReactNode }) => {
+  const triggerMockEvent = () => {
+    // A mock dev-only trigger
+    socket.emitFromServer('ZoneUpdated', { id: 'mock_zone', status: 'live event triggered!' });
+    alert('Mock WebSocket ZoneUpdated event fired (check console / React Query later).');
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
+      <header className="bg-primary text-primary-foreground p-4 flex justify-between items-center shadow-md">
+        <h1 className="text-xl font-bold">PS20 — Emergency Coordinator</h1>
+        <nav className="space-x-4">
+          <NavLink to="/" className={({isActive}) => isActive ? "font-bold underline" : ""}>Dashboard</NavLink>
+          <NavLink to="/report" className={({isActive}) => isActive ? "font-bold underline" : ""}>Report Zone</NavLink>
+          <NavLink to="/inventory" className={({isActive}) => isActive ? "font-bold underline" : ""}>Inventory</NavLink>
+          <NavLink to="/agency" className={({isActive}) => isActive ? "font-bold underline" : ""}>Agency Console</NavLink>
+          <NavLink to="/audit" className={({isActive}) => isActive ? "font-bold underline" : ""}>Audit Log</NavLink>
+        </nav>
+        <button 
+          onClick={triggerMockEvent}
+          className="bg-accent text-accent-foreground px-3 py-1 rounded text-sm hover:opacity-90"
         >
-          Count is {count}
+          [DEV] Fire WS Event
         </button>
-      </section>
+      </header>
+      <main className="flex-1 p-6">
+        {children}
+      </main>
+    </div>
+  );
+};
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <Shell>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/report" element={<ZoneReporting />} />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/agency" element={<AgencyConsole />} />
+            <Route path="/audit" element={<AuditLog />} />
+          </Routes>
+        </Shell>
+      </Router>
+    </QueryClientProvider>
+  );
 }
 
-export default App
+export default App;
