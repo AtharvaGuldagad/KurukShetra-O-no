@@ -214,7 +214,7 @@ export default function AgencyConsole() {
                   <div className="flex items-center gap-2 shrink-0">
                     {/* Action 1: Accept */}
                     <button
-                      onClick={() => mutation.mutate({ id: task.id, status: 'in_progress' })}
+                      onClick={() => mutation.mutate({ id: task.id, status: 'Accepted' })}
                       disabled={!isAssigned || mutation.isPending}
                       className={cn(
                         'px-3 py-1 text-xs uppercase tracking-tight border transition-none',
@@ -228,7 +228,7 @@ export default function AgencyConsole() {
 
                     {/* Action 2: Mark in progress */}
                     <button
-                      onClick={() => mutation.mutate({ id: task.id, status: 'in_progress' })}
+                      onClick={() => mutation.mutate({ id: task.id, status: 'In-Progress' })}
                       disabled={isInProgress || isCompleted || mutation.isPending}
                       className={cn(
                         'px-3 py-1 text-xs uppercase tracking-tight border transition-none',
@@ -242,7 +242,7 @@ export default function AgencyConsole() {
 
                     {/* Action 3: Mark complete */}
                     <button
-                      onClick={() => mutation.mutate({ id: task.id, status: 'completed' })}
+                      onClick={() => mutation.mutate({ id: task.id, status: 'Completed' })}
                       disabled={isCompleted || mutation.isPending}
                       className={cn(
                         'px-3 py-1 text-xs uppercase tracking-tight border transition-none',

@@ -58,7 +58,7 @@ async def _gemini_extract(raw_text: str, report_id: str) -> dict:
     prompt = f"{SYSTEM_PROMPT}\n\n--- RAW REPORT ---\n{raw_text}\n--- END REPORT ---"
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-3.6-flash",
         contents=prompt,
     )
 

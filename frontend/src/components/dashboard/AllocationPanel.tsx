@@ -20,6 +20,14 @@ export function AllocationPanel() {
     },
   });
 
+  const recalcMutation = useMutation({
+    mutationFn: () => apiClient.recalculateAllocations(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['zones'] });
+    },
+  });
+
   if (isLoading) {
     return <div className="p-4 text-slate-500 font-mono text-xs">Loading allocations...</div>;
   }
@@ -38,8 +46,9 @@ export function AllocationPanel() {
           AI-Proposed Resource Allocations
         </div>
         <button 
-          onClick={() => apiClient.recalculateAllocations()}
-          className="text-[10px] uppercase font-bold text-[#E8EAED] bg-[#3E7CB1] px-2 py-1 rounded hover:bg-[#2A5C8A] transition-colors flex items-center gap-1"
+          onClick={() => recalcMutation.mutate()}
+          disabled={recalcMutation.isPending}
+          className="text-[10px] uppercase font-bold text-[#E8EAED] bg-[#3E7CB1] px-2 py-1 rounded hover:bg-[#2A5C8A] transition-colors flex items-center gap-1 disabled:opacity-50"
         >
           <Brain className="w-3 h-3" /> Force Recalculate
         </button>

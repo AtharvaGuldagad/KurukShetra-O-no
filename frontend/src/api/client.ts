@@ -52,6 +52,17 @@ function transformBackendInventory(r: any): InventoryItem {
 }
 
 function transformBackendAllocation(a: any): Allocation {
+  // Backend uses: Proposed, Approved, Rejected, Dispatched
+  // Frontend uses: pending_approval, approved, rejected, dispatched
+  const statusMap: Record<string, string> = {
+    'Proposed': 'pending_approval',
+    'Approved': 'approved',
+    'Rejected': 'rejected',
+    'Dispatched': 'dispatched',
+  };
+  const rawStatus = a.status ?? 'Proposed';
+  const normalizedStatus = statusMap[rawStatus] ?? rawStatus.toLowerCase().replace(/[- ]/g, '_');
+
   return {
     allocation_id: a.allocation_id ?? a.id,
     zone_id: a.zone_id,
@@ -61,11 +72,23 @@ function transformBackendAllocation(a: any): Allocation {
     assigned_agency: a.assigned_agency,
     reasoning: a.reasoning ?? '',
     requires_human_approval: a.requires_human_approval ?? false,
+    status: normalizedStatus,
     timestamp: a.timestamp ?? a.created_at ?? new Date().toISOString(),
   };
 }
 
 function transformBackendTask(t: any): AgencyTask {
+  // Backend uses: Pending, Accepted, In-Progress, Completed
+  // Frontend uses: assigned, in_progress, completed
+  const statusMap: Record<string, AgencyTask['status']> = {
+    'Pending': 'assigned',
+    'Accepted': 'in_progress',
+    'In-Progress': 'in_progress',
+    'Completed': 'completed',
+  };
+  const rawStatus = t.status ?? 'Pending';
+  const normalizedStatus = statusMap[rawStatus] ?? (rawStatus.toLowerCase().replace(/[- ]/g, '_') as AgencyTask['status']);
+
   return {
     id: t.id,
     agency_id: t.agency_id ?? '',
@@ -74,7 +97,7 @@ function transformBackendTask(t: any): AgencyTask {
     zone_name: t.zone_name ?? '',
     allocation_id: t.allocation_id ?? '',
     task_type: t.task_type ?? '',
-    status: (t.status ?? 'assigned').toLowerCase().replace('-', '_') as AgencyTask['status'],
+    status: normalizedStatus,
     capacity: t.capacity ?? 0,
   };
 }
@@ -104,16 +127,22 @@ export const apiClient = {
   },
 
   // POST /reports
-  submitReport: async (report: Partial<Zone>): Promise<Zone> => {
+  submitReport: async (report: Partial<Zone> & { description_raw?: string }): Promise<Zone> => {
 
     // Build raw_text from structured report for Agent A processing
-    const rawText = [
+    // Include the citizen's free-text description — this is the primary input for Agent A
+    const parts = [
       `Location: ${report.location?.name ?? 'Unknown'}`,
       `Disaster type: ${report.disaster_type ?? 'unknown'}`,
       `Population affected: ${report.population_affected_est ?? 0}`,
       `Casualties: ${report.casualties ?? 0}`,
       `Needs: ${report.needs?.map(n => `${n.type} (${n.urgency})`).join(', ') ?? 'unknown'}`,
-    ].join('. ');
+    ];
+    // Append raw description so Agent A can extract richer context
+    if ((report as any).description_raw) {
+      parts.push(`Situation report: ${(report as any).description_raw}`);
+    }
+    const rawText = parts.join('. ');
 
     const result = await fetchApi<any>('/reports', {
       method: 'POST',
@@ -155,8 +184,8 @@ export const apiClient = {
   },
 
   // POST /allocations/recalculate
-  recalculateAllocations: async (): Promise<void> => {
-    await fetchApi<void>('/allocations/recalculate', { method: 'POST' });
+  recalculateAllocations: async (): Promise<any> => {
+    return await fetchApi<any>('/allocations/recalculate', { method: 'POST' });
   },
 
   // PATCH /agency-tasks/:id/status
@@ -188,11 +217,20 @@ export const apiClient = {
   },
   
   // PATCH /allocations/:id/status
+  // Backend expects capitalized statuses: Approved, Rejected, Dispatched
   updateAllocationStatus: async (id: string, status: string): Promise<Allocation> => {
+    // Normalize: frontend sends lowercase, backend expects capitalized
+    const backendStatusMap: Record<string, string> = {
+      'approved': 'Approved',
+      'rejected': 'Rejected',
+      'dispatched': 'Dispatched',
+    };
+    const backendStatus = backendStatusMap[status] ?? status;
+
     const data = await fetchApi<any>(`/allocations/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status: backendStatus })
     });
-    return data;
+    return transformBackendAllocation(data);
   }
 };

@@ -47,10 +47,12 @@ async def update_task_status(
             detail=f"Invalid status. Must be one of: {valid_statuses}"
         )
 
-    # Map frontend lowercase snake_case to backend capitalized format
+    # Map frontend formats to backend capitalized format
     status_map = {
         "pending": "Pending",
+        "accepted": "Accepted",
         "in_progress": "In-Progress",
+        "in-progress": "In-Progress",
         "completed": "Completed"
     }
     
