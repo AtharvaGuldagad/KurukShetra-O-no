@@ -5,7 +5,8 @@ Solace is an intelligent system designed to manage disaster relief efforts. It p
 
 ## Architecture
 The system is built on a microservices architecture communicating via an event bus. It relies heavily on a robust backend and dedicated AI agents to process dynamic information in real time.
-<img width="1024" height="559" alt="e1505db4-8166-43e2-9539-a796e7a0f192" src="https://github.com/user-attachments/assets/b3a27d64-68c2-41a0-a0bd-a612b41935a0" />
+
+<img width="1024" height="559" alt="21bcaa67-8170-4360-a04c-26a9e526e580" src="https://github.com/user-attachments/assets/da7a57ac-907e-43ef-bdb5-be50acf5b463" />
 
 ### The AI Layer
 The core logic of the system consists of two distinct AI agents:
