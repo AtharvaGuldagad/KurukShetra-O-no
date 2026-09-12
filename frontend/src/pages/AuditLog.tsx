@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiClient, type AuditFilter } from '../api/client';
+import { apiClient } from '../api/client';
 import { type AuditEntry } from '../api/mockData';
 import { cn } from '../lib/utils';
 import { RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
@@ -34,7 +34,7 @@ export default function AuditLog() {
   const [dateRange, setDateRange] = useState<'all' | '1h' | '24h'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const filters: AuditFilter = {
+  const filters = {
     event_type: eventType,
     actor: actor,
     search: search

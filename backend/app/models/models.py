@@ -21,6 +21,9 @@ class ZoneState(Base):
     source_confidence = Column(Float, default=1.0)
     source_refs = Column(JSON, default=list)  # ["news_url", "report_id"]
     version = Column(Integer, default=1)
+    population_affected_est = Column(Integer, default=0)
+    casualties = Column(Integer, default=0)
+    deterioration_delta = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Resource(Base):

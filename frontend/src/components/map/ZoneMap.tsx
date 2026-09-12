@@ -3,27 +3,27 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { type Zone } from '../../api/mockData';
 
-const STYLE_ID = 'ps20-map-styles';
+const STYLE_ID = 'solace-map-styles';
 if (!document.getElementById(STYLE_ID)) {
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = `
-    @keyframes ps20-live-pulse {
+    @keyframes solace-live-pulse {
       0%   { box-shadow: 0 0 0 0 rgba(62, 124, 177, 0.8); }
       70%  { box-shadow: 0 0 0 10px rgba(62, 124, 177, 0); }
       100% { box-shadow: 0 0 0 0 rgba(62, 124, 177, 0); }
     }
-    .ps20-marker-wrap {
+    .solace-marker-wrap {
       background: transparent !important;
       border: none !important;
     }
-    .ps20-marker-inner {
+    .solace-marker-inner {
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .ps20-marker-dot {
+    .solace-marker-dot {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -36,10 +36,10 @@ if (!document.getElementById(STYLE_ID)) {
       user-select: none;
       cursor: pointer;
     }
-    .ps20-marker-pulse-active {
-      animation: ps20-live-pulse 600ms ease-out forwards;
+    .solace-marker-pulse-active {
+      animation: solace-live-pulse 600ms ease-out forwards;
     }
-    .leaflet-tooltip-ps20 {
+    .leaflet-tooltip-solace {
       background: #171A1D;
       border: 1px solid #2A2E33;
       color: #E8EAED;
@@ -49,16 +49,20 @@ if (!document.getElementById(STYLE_ID)) {
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
       font-family: 'Public Sans', sans-serif;
     }
-    .leaflet-tooltip-ps20.leaflet-tooltip-top::before {
+    .leaflet-tooltip-solace.leaflet-tooltip-top::before {
       border-top-color: #2A2E33;
     }
     .leaflet-container {
-      background: #0E0F11 !important;
+      background: #0d0e10 !important;
       font-family: 'Public Sans', sans-serif !important;
     }
-    /* Minimal dark CartoDB attribution styling */
+    /* Apply dark inversion filter ONLY to the tile pane, not markers */
+    .leaflet-tile-pane {
+      filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(1.35) saturate(0.55);
+    }
+    /* Attribution dark styling */
     .leaflet-control-attribution {
-      background: rgba(14, 15, 17, 0.8) !important;
+      background: rgba(14, 15, 17, 0.85) !important;
       color: #9BA1A8 !important;
       font-size: 9px !important;
     }
@@ -88,13 +92,13 @@ function createZoneIcon(zone: Zone, isSelected: boolean, isRecentlyUpdated: bool
   const sizeRatio = Math.min(1, Math.max(0, (pop - 1000) / 20000));
   const baseSize = Math.round(18 + sizeRatio * 6);
   const wrapSize = baseSize + 8;
-  const pulseClass = isRecentlyUpdated ? 'ps20-marker-pulse-active' : '';
+  const pulseClass = isRecentlyUpdated ? 'solace-marker-pulse-active' : '';
 
   return L.divIcon({
-    className: 'ps20-marker-wrap',
+    className: 'solace-marker-wrap',
     html: `
-      <div class="ps20-marker-inner" style="width:${wrapSize}px;height:${wrapSize}px;">
-        <div class="ps20-marker-dot ${pulseClass}" style="
+      <div class="solace-marker-inner" style="width:${wrapSize}px;height:${wrapSize}px;">
+        <div class="solace-marker-dot ${pulseClass}" style="
           width:${baseSize}px;
           height:${baseSize}px;
           background:${color};
@@ -128,7 +132,7 @@ export default function ZoneMap({
   const onSelectRef  = useRef(onSelectZone);
   onSelectRef.current = onSelectZone;
 
-  // Init clean CartoDB Dark Matter map once (India view)
+  // Init OSM + dark CSS-filter map once (India view)
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
@@ -138,16 +142,21 @@ export default function ZoneMap({
       zoomControl: true,
       attributionControl: true,
       minZoom: 4,
-      maxZoom: 16,
+      maxZoom: 18,
     });
 
-    // CartoDB Dark Matter: Clean, minimal, high-contrast, uncluttered basemap
+    // OpenStreetMap standard tiles — free, no API key.
+    // The dark look is achieved purely via CSS filter on .leaflet-tile-pane
+    // (invert + hue-rotate + brightness/contrast/saturate), so markers
+    // rendered in separate panes remain unfiltered and full-colour.
     L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       {
-        attribution: '&copy; CartoDB &copy; OpenStreetMap',
-        subdomains: 'abcd',
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
         maxZoom: 19,
+        // Tell browsers the tiles are cross-origin so the CSS filter renders correctly
+        crossOrigin: 'anonymous',
       }
     ).addTo(map);
 
@@ -193,7 +202,7 @@ export default function ZoneMap({
           .bindTooltip(buildTooltip(zone), {
             direction: 'top',
             offset: [0, -4],
-            className: 'leaflet-tooltip-ps20',
+            className: 'leaflet-tooltip-solace',
           })
           .on('click', () => onSelectRef.current(zone.zone_id));
 

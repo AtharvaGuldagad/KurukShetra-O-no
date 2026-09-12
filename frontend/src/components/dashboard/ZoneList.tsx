@@ -11,8 +11,6 @@ interface ZoneRowProps {
 
 export function ZoneRow({ zone, isSelected, isRecentlyUpdated, onClick }: ZoneRowProps) {
   const topNeed = zone.needs[0];
-  // Stable mockup or derived timestamp from zone
-  const timestamp = "18:42:15Z";
 
   return (
     <div
@@ -29,48 +27,37 @@ export function ZoneRow({ zone, isSelected, isRecentlyUpdated, onClick }: ZoneRo
       {/* 3px left-edge bar carrying severity tier */}
       <SeverityEdgeBar tier={zone.priority_tier} />
 
-      {/* Row content */}
-      <div className="flex-1 px-3 py-2.5 min-w-0">
+      {/* Row content — one primary line + one secondary line */}
+      <div className="flex-1 px-3 py-2 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-semibold text-sm text-[#E8EAED] truncate">
-              {zone.location.name}
-            </span>
-            <span className="font-mono text-xs text-[#9BA1A8] shrink-0">
+          <span className="font-semibold text-[13px] text-[#E8EAED] truncate">
+            {zone.location.name}
+            <span className="font-mono font-normal text-[11px] text-[#9BA1A8] ml-1.5">
               [{zone.zone_id}]
             </span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="font-mono text-xs text-[#E8EAED]">
-              SCORE {zone.severity_score}
-            </span>
-            <span className="font-mono text-[11px] text-[#9BA1A8]">
-              {timestamp}
-            </span>
-          </div>
+          </span>
+          <span className="font-mono text-xs text-[#E8EAED] shrink-0 tabular-nums">
+            {zone.severity_score}
+          </span>
         </div>
 
-        <div className="mt-1.5 flex items-center justify-between text-xs text-[#9BA1A8]">
-          <div className="flex items-center gap-3">
-            <span>
-              Pop: <strong className="font-mono text-[#E8EAED]">{zone.population_affected_est.toLocaleString()}</strong>
-            </span>
+        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[#9BA1A8] truncate">
+          <span className="uppercase shrink-0">{zone.disaster_type}</span>
+          <span aria-hidden="true">·</span>
+          <span className="font-mono shrink-0">
+            POP {zone.population_affected_est.toLocaleString()}
             {zone.casualties > 0 && (
-              <span className="text-[#C4432E]">
-                Casualties: <strong className="font-mono text-[#C4432E]">{zone.casualties}</strong>
-              </span>
+              <span className="text-[#C4432E]"> · {zone.casualties} CAS</span>
             )}
-            {topNeed && (
-              <span className="truncate">
-                Top need: <span className="text-[#E8EAED]">{topNeed.type} ({topNeed.urgency})</span>
-              </span>
-            )}
-          </div>
-
-          <span className="text-xs uppercase text-[#9BA1A8]">
-            {zone.disaster_type}
           </span>
+          {topNeed && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="truncate text-[#E8EAED]/80">
+                {topNeed.type} ({topNeed.urgency})
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>

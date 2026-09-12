@@ -5,14 +5,14 @@ import { AllocationPanel } from './AllocationPanel';
 import { AgencyTasksPanel } from './AgencyTasksPanel';
 
 export function BottomDock() {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'allocations' | 'tasks'>('allocations');
 
   return (
     <div 
       className={cn(
         "absolute bottom-0 left-0 right-0 bg-[#171A1D] border-t border-[#2A2E33] flex flex-col transition-all duration-150 ease-out",
-        isOpen ? "h-64" : "h-9"
+        isOpen ? "h-56 max-h-[42vh]" : "h-9"
       )}
       style={{ zIndex: 1000 }}
     >
@@ -62,12 +62,12 @@ export function BottomDock() {
         </button>
       </div>
 
-      {/* Dock Content */}
+      {/* Dock Content — lazy mount so collapsed dock costs nothing */}
       <div className={cn(
         "flex-1 overflow-hidden flex",
         isOpen ? "block" : "hidden"
       )}>
-        {activeTab === 'allocations' ? <AllocationPanel /> : <AgencyTasksPanel />}
+        {isOpen && (activeTab === 'allocations' ? <AllocationPanel /> : <AgencyTasksPanel />)}
       </div>
     </div>
   );

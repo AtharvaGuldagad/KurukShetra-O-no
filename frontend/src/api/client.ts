@@ -1,16 +1,15 @@
-import { seedZones, seedInventory, seedAllocations, seedAgencyTasks, seedAuditLog, type Zone, type InventoryItem, type Allocation, type AgencyTask, type AuditEntry } from './mockData';
-import { socket } from './socket';
+import type { Zone, InventoryItem, Allocation, AgencyTask, AuditEntry } from './mockData';
 
-// ─── Feature Flag ────────────────────────────────────────────────────────────
-// Toggle this to false to swap to the real REST/WS backend.
-// The base URL can also be set via VITE_API_BASE_URL env var.
-const USE_MOCK = true;
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
-// ─── Real-backend helper ──────────────────────────────────────────────────────
 async function fetchApi<T>(endpoint: string, init?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('solace_auth_token');
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const res = await fetch(`${BASE_URL}${endpoint}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { ...headers, ...init?.headers },
     ...init,
   });
   if (!res.ok) {
@@ -20,207 +19,180 @@ async function fetchApi<T>(endpoint: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ─── Mock in-memory DB ────────────────────────────────────────────────────────
-export const db = {
-  zones: [...seedZones],
-  inventory: [...seedInventory],
-  allocations: [...seedAllocations],
-  agencyTasks: [...seedAgencyTasks],
-  auditLog: [...seedAuditLog] as AuditEntry[]
-};
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-let auditIdCounter = 100;
-export function addAuditEntry(entry: Omit<AuditEntry, 'id'>) {
-  const full: AuditEntry = { id: `audit_${auditIdCounter++}`, ...entry };
-  db.auditLog.unshift(full);
-  return full;
+// ─── Response Transformers ────────────────────────────────────────────────────
+// Backend returns slightly different shapes — normalize to frontend types.
+
+function transformBackendZone(z: any): Zone {
+  return {
+    zone_id: z.zone_id ?? z.id,
+    location: z.location ?? { lat: 0, lng: 0, name: 'Unknown' },
+    disaster_type: z.disaster_type ?? 'other',
+    population_affected_est: z.population_affected_est ?? 0,
+    casualties: z.casualties ?? 0,
+    needs: z.needs ?? [],
+    severity_score: z.severity_score ?? 0,
+    priority_tier: z.priority_tier ?? 'Low',
+    source_confidence: z.source_confidence ?? 0,
+    source_refs: z.source_refs ?? [],
+    deterioration_delta: z.deterioration_delta ?? 'unknown',
+  };
 }
 
-export interface AuditFilter {
-  event_type?: string;
-  actor?: string;
-  search?: string;
+function transformBackendInventory(r: any): InventoryItem {
+  return {
+    id: r.id,
+    resource_type: r.resource_type,
+    quantity: r.quantity_available ?? r.quantity ?? 0,
+    baseline_quantity: r.baseline_quantity ?? r.quantity_available ?? 0,
+    depot: r.depot_location ?? r.depot ?? '',
+    agency: r.owning_agency ?? r.agency ?? '',
+  };
 }
 
-// ─── API Client ───────────────────────────────────────────────────────────────
+function transformBackendAllocation(a: any): Allocation {
+  return {
+    allocation_id: a.allocation_id ?? a.id,
+    zone_id: a.zone_id,
+    resource_type: a.resource_type,
+    quantity: a.quantity,
+    source_depot: a.source_depot,
+    assigned_agency: a.assigned_agency,
+    reasoning: a.reasoning ?? '',
+    requires_human_approval: a.requires_human_approval ?? false,
+    timestamp: a.timestamp ?? a.created_at ?? new Date().toISOString(),
+  };
+}
+
+function transformBackendTask(t: any): AgencyTask {
+  return {
+    id: t.id,
+    agency_id: t.agency_id ?? '',
+    agency_name: t.agency_name ?? t.agency_id ?? '',
+    zone_id: t.zone_id ?? '',
+    zone_name: t.zone_name ?? '',
+    allocation_id: t.allocation_id ?? '',
+    task_type: t.task_type ?? '',
+    status: (t.status ?? 'assigned').toLowerCase().replace('-', '_') as AgencyTask['status'],
+    capacity: t.capacity ?? 0,
+  };
+}
+
+function transformBackendAudit(e: any): AuditEntry {
+  return {
+    id: e.id?.toString() ?? '',
+    timestamp: e.created_at ?? e.timestamp ?? new Date().toISOString(),
+    event_type: (e.event_type ?? '').replace('.', '_') as AuditEntry['event_type'],
+    actor: e.actor ?? 'SYSTEM',
+    zone_id: e.payload?.zone_id ?? e.zone_id,
+    summary: e.payload?.summary ?? e.summary ?? `${e.event_type} event`,
+    raw_payload: e.payload ?? e.raw_payload,
+  };
+}
+
 export const apiClient = {
-  // GET /api/zones
+  // GET /zones
   getZones: async (): Promise<Zone[]> => {
-    if (!USE_MOCK) return fetchApi<Zone[]>('/api/zones');
-    await delay(300);
-    return [...db.zones].sort((a, b) => b.severity_score - a.severity_score);
+    const data = await fetchApi<any[]>('/zones');
+    return data.map(transformBackendZone).sort((a, b) => b.severity_score - a.severity_score);
   },
 
-  // GET /api/zones/:id/history
+  // GET /zones/:id/history
   getZoneHistory: async (id: string): Promise<any[]> => {
-    if (!USE_MOCK) return fetchApi<any[]>(`/api/zones/${id}/history`);
-    await delay(300);
-    const zone = db.zones.find(z => z.zone_id === id);
-    return [
-      { timestamp: new Date(Date.now() - 7200000).toISOString(), severity_score: (zone?.severity_score || 50) - 10, priority_tier: zone?.priority_tier, note: 'Initial report' },
-      { timestamp: new Date(Date.now() - 3600000).toISOString(), severity_score: (zone?.severity_score || 50) - 5, priority_tier: zone?.priority_tier, note: 'Updated from field team' },
-      { timestamp: new Date().toISOString(), severity_score: zone?.severity_score, priority_tier: zone?.priority_tier, note: 'Current state' },
-    ];
+    return await fetchApi<any[]>(`/zones/${id}/history`);
   },
 
-  // POST /api/zones/report
+  // POST /reports
   submitReport: async (report: Partial<Zone>): Promise<Zone> => {
-    if (!USE_MOCK) return fetchApi<Zone>('/api/zones/report', { method: 'POST', body: JSON.stringify(report) });
-    await delay(600);
 
-    const existingIdx = db.zones.findIndex(z => z.zone_id === report.zone_id);
-    let zone: Zone;
+    // Build raw_text from structured report for Agent A processing
+    const rawText = [
+      `Location: ${report.location?.name ?? 'Unknown'}`,
+      `Disaster type: ${report.disaster_type ?? 'unknown'}`,
+      `Population affected: ${report.population_affected_est ?? 0}`,
+      `Casualties: ${report.casualties ?? 0}`,
+      `Needs: ${report.needs?.map(n => `${n.type} (${n.urgency})`).join(', ') ?? 'unknown'}`,
+    ].join('. ');
 
-    if (existingIdx >= 0) {
-      db.zones[existingIdx] = { ...db.zones[existingIdx], ...report } as Zone;
-      zone = db.zones[existingIdx];
-    } else {
-      zone = {
-        zone_id: `zone_${Date.now()}`,
-        severity_score: 50,
-        priority_tier: 'Medium',
-        source_confidence: 0.7,
-        source_refs: ['field_report'],
-        deterioration_delta: 'new',
-        ...report
-      } as Zone;
-      db.zones.push(zone);
-    }
-
-    addAuditEntry({
-      timestamp: new Date().toISOString(),
-      event_type: 'report_submitted',
-      actor: 'Field Reporter',
-      zone_id: zone.zone_id,
-      summary: `New zone report submitted: ${zone.location?.name} (severity: ${zone.severity_score})`,
-      raw_payload: zone
+    const result = await fetchApi<any>('/reports', {
+      method: 'POST',
+      body: JSON.stringify({ raw_text: rawText, reported_by: 'Field Reporter' }),
     });
 
-    socket.emitFromServer('ZoneUpdated', zone);
-    return zone;
+    // Return a Zone-compatible shape from the backend response
+    return transformBackendZone({
+      zone_id: result.zone_id,
+      ...result.state,
+    });
   },
 
-  // GET /api/inventory
+  // GET /inventory
   getInventory: async (): Promise<InventoryItem[]> => {
-    if (!USE_MOCK) return fetchApi<InventoryItem[]>('/api/inventory');
-    await delay(300);
-    return [...db.inventory];
+    const data = await fetchApi<any[]>('/inventory');
+    return data.map(transformBackendInventory);
   },
 
-  // PATCH /api/inventory/:id
+  // PATCH /inventory/:id
   updateInventory: async (id: string, updates: Partial<InventoryItem>): Promise<InventoryItem> => {
-    if (!USE_MOCK) return fetchApi<InventoryItem>(`/api/inventory/${id}`, { method: 'PATCH', body: JSON.stringify(updates) });
-    await delay(300);
-    const idx = db.inventory.findIndex(i => i.id === id);
-    if (idx === -1) throw new Error('Inventory item not found');
 
-    db.inventory[idx] = { ...db.inventory[idx], ...updates };
+    const backendUpdates: any = {};
+    if (updates.quantity !== undefined) backendUpdates.quantity_available = updates.quantity;
+    if (updates.depot !== undefined) backendUpdates.depot_location = updates.depot;
+    if (updates.agency !== undefined) backendUpdates.owning_agency = updates.agency;
 
-    addAuditEntry({
-      timestamp: new Date().toISOString(),
-      event_type: 'inventory_updated',
-      actor: 'Coordinator',
-      summary: `Inventory updated: ${db.inventory[idx].resource_type} at ${db.inventory[idx].depot} → ${db.inventory[idx].quantity} units`,
-      raw_payload: db.inventory[idx]
+    const data = await fetchApi<any>(`/inventory/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(backendUpdates),
     });
-
-    // Simulate agent recalculating allocations after inventory change
-    setTimeout(() => {
-      addAuditEntry({
-        timestamp: new Date().toISOString(),
-        event_type: 'allocation_recalculated',
-        actor: 'Agent B',
-        summary: 'Allocations recalculated following inventory update.',
-        raw_payload: { reason: 'inventory_changed' }
-      });
-      socket.emitFromServer('AllocationRecalculated', { reason: 'inventory_changed' });
-    }, 1500);
-
-    return db.inventory[idx];
+    return transformBackendInventory(data);
   },
 
-  // GET /api/allocations
+  // GET /allocations
   getAllocations: async (): Promise<Allocation[]> => {
-    if (!USE_MOCK) return fetchApi<Allocation[]>('/api/allocations');
-    await delay(300);
-    return [...db.allocations];
+    const data = await fetchApi<any[]>('/allocations');
+    return data.map(transformBackendAllocation);
   },
 
-  // POST /api/allocations/recalculate
+  // POST /allocations/recalculate
   recalculateAllocations: async (): Promise<void> => {
-    if (!USE_MOCK) { await fetchApi<void>('/api/allocations/recalculate', { method: 'POST' }); return; }
-    await delay(1000);
-
-    addAuditEntry({
-      timestamp: new Date().toISOString(),
-      event_type: 'allocation_recalculated',
-      actor: 'Coordinator (Manual)',
-      summary: 'Manual reallocation triggered — Agent B recalculating priorities.',
-      raw_payload: { reason: 'manual_trigger' }
-    });
-
-    socket.emitFromServer('AllocationRecalculated', { reason: 'manual_trigger' });
+    await fetchApi<void>('/allocations/recalculate', { method: 'POST' });
   },
 
-  // POST /api/agency-tasks/:id/status
+  // PATCH /agency-tasks/:id/status
   updateAgencyTaskStatus: async (id: string, status: string): Promise<AgencyTask> => {
-    if (!USE_MOCK) return fetchApi<AgencyTask>(`/api/agency-tasks/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
-    await delay(300);
-    const idx = db.agencyTasks.findIndex(t => t.id === id);
-    if (idx === -1) throw new Error('Task not found');
 
-    const prev = db.agencyTasks[idx].status;
-    db.agencyTasks[idx].status = status as AgencyTask['status'];
-
-    addAuditEntry({
-      timestamp: new Date().toISOString(),
-      event_type: 'agency_status_changed',
-      actor: db.agencyTasks[idx].agency_name,
-      zone_id: db.agencyTasks[idx].zone_id,
-      summary: `${db.agencyTasks[idx].agency_name} task status changed: ${prev} → ${status} (zone: ${db.agencyTasks[idx].zone_name})`,
-      raw_payload: db.agencyTasks[idx]
+    const data = await fetchApi<any>(`/agency-tasks/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
     });
-
-    socket.emitFromServer('AgencyStatusChanged', db.agencyTasks[idx]);
-    return db.agencyTasks[idx];
+    return transformBackendTask(data);
   },
 
-  // GET /api/audit-log?event_type=...&actor=...&search=...
-  getAuditLog: async (filter?: AuditFilter): Promise<AuditEntry[]> => {
-    if (!USE_MOCK) {
-      const params = new URLSearchParams();
-      if (filter?.event_type && filter.event_type !== 'all') params.set('event_type', filter.event_type);
-      if (filter?.actor && filter.actor !== 'all') params.set('actor', filter.actor);
-      if (filter?.search) params.set('search', filter.search);
-      const qs = params.toString();
-      return fetchApi<AuditEntry[]>(`/api/audit-log${qs ? `?${qs}` : ''}`);
-    }
-    await delay(300);
-    let results = [...db.auditLog];
-    if (filter) {
-      if (filter.event_type && filter.event_type !== 'all') {
-        results = results.filter(r => r.event_type === filter.event_type);
-      }
-      if (filter.actor && filter.actor !== 'all') {
-        results = results.filter(r => r.actor === filter.actor);
-      }
-      if (filter.search) {
-        const query = filter.search.toLowerCase();
-        results = results.filter(r =>
-          r.summary.toLowerCase().includes(query) ||
-          r.zone_id?.toLowerCase().includes(query)
-        );
-      }
-    }
-    return results;
+  // GET /audit-log?event_type=...&actor=...&search=...
+  getAuditLog: async (filter?: { event_type?: string, actor?: string, search?: string }): Promise<AuditEntry[]> => {
+
+    const params = new URLSearchParams();
+    if (filter?.event_type && filter.event_type !== 'all') params.set('event_type', filter.event_type);
+    if (filter?.actor && filter.actor !== 'all') params.set('actor', filter.actor);
+    if (filter?.search) params.set('search', filter.search);
+    const qs = params.toString();
+    const data = await fetchApi<any[]>(`/audit-log${qs ? `?${qs}` : ''}`);
+    return data.map(transformBackendAudit);
   },
 
-  // GET /api/agency-tasks
+  // GET /agency-tasks
   getAgencyTasks: async (): Promise<AgencyTask[]> => {
-    if (!USE_MOCK) return fetchApi<AgencyTask[]>('/api/agency-tasks');
-    await delay(300);
-    return [...db.agencyTasks];
+    const data = await fetchApi<any[]>('/agency-tasks');
+    return data.map(transformBackendTask);
+  },
+  
+  // PATCH /allocations/:id/status
+  updateAllocationStatus: async (id: string, status: string): Promise<Allocation> => {
+    const data = await fetchApi<any>(`/allocations/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+    return data;
   }
 };
